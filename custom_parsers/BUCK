@@ -19,6 +19,7 @@ zs_library(
         "../cpp:openzl_cpp",
         "../tools/ml_selector:ml_selector_graph",
         "csv:csv_parser",
+        "json:json_parser",
         "parquet:parquet_graph",
         "shared_components:clustering",
     ],

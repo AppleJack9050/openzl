@@ -5,6 +5,7 @@
 
 #include "custom_parsers/csv/csv_profile.h"
 #include "custom_parsers/dependency_registration.h"
+#include "custom_parsers/json/json_lex.h"
 #include "custom_parsers/parquet/parquet_graph.h"
 #include "tools/ml_selector/ml_selector_graph.h"
 
@@ -40,9 +41,19 @@ void processDependencies(Compressor& compressor, poly::string_view serialized)
         }
     }
 
-    if (deps.nodeNames.size() > 0) {
-        // TODO register any non-standard nodes that may appear in a
-        // compressor
+    for (const auto& nodeName : deps.nodeNames) {
+        // json profile: the lexer is a custom codec, so a serialized json
+        // compressor cannot be rebuilt until the node is registered.
+        if (nodeName == "json_lex" || nodeName == ZL_JSON_LEX_NODE_NAME) {
+            ZL_JsonLex_registerEncoder(compressor.get());
+        }
+    }
+}
+
+void registerCustomDecoders(ZL_DCtx* dctx)
+{
+    if (ZL_isError(ZL_JsonLex_registerDecoder(dctx))) {
+        throw std::runtime_error("Failed to register the json_lex decoder");
     }
 }
 std::unique_ptr<Compressor> createCompressorFromSerialized(

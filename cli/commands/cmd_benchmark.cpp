@@ -13,6 +13,7 @@
 #include "openzl/zl_compress.h"
 
 #include "cli/utils/util.h"
+#include "custom_parsers/dependency_registration.h"
 #include "tools/io/OutputNull.h"
 #include "tools/logger/Logger.h"
 
@@ -101,6 +102,7 @@ BenchmarkResult runCompressionBenchmarks(const BenchmarkArgs& args)
     auto cctx = createCompressionContext(
             *args.compressor(), args.level, args.strict);
     DCtx dctx;
+    custom_parsers::registerCustomDecoders(dctx.get());
 
     // if output is not specified, don't write csv-formatted summary statistics
     tools::io::OutputNull devnull{};

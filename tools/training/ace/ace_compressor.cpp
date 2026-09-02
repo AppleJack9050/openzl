@@ -2,6 +2,8 @@
 
 #include "tools/training/ace/ace_compressor.h"
 
+#include "custom_parsers/dependency_registration.h"
+
 #include <sstream>
 #include <type_traits>
 
@@ -684,6 +686,7 @@ poly::optional<ACECompressionResult> benchmark(
     CCtx cctx;
 
     DCtx dctx;
+    openzl::custom_parsers::registerCustomDecoders(dctx.get());
 
     ACECompressionResult result{};
     for (const auto& input : inputs) {

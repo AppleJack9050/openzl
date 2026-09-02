@@ -76,3 +76,11 @@ Because the impact of training is so stark, the CLI requires that trainable comp
 ./zli compress --profile csv --train-inline examples/getting_started/sample_inputs/csv_samples/0001.csv -o inline_train.zl
 ```
 The results are obviously better when we overfit to just one sample, however the power of training is lost because this cost is paid per compression instead of being spread over many compressions.
+
+## JSON and JSON-Lines
+The `json` profile is for JSON text, and especially for JSON-Lines corpora (one record per line). It lexes the input into separate streams -- structure, object keys, string values, numbers -- so each is compressed on its own terms: keys are tokenized, numbers are parsed to integers where that is lossless, and string values are unescaped and de-duplicated before going to Zstd with a 128MB window and long-distance matching. That last part is what lets it find the boilerplate that repeats across records, which a default-window compressor cannot see.
+```sh
+./zli compress --profile json records.jsonl -o records.zl
+./zli compress --profile json --profile-arg 9 records.jsonl -o records.zl
+```
+The optional `--profile-arg` is the Zstd level for the string content (default 6). The lexer is lossless on any input -- non-JSON bytes and non-canonical escapes are carried through verbatim -- so `--strict` never rejects a file; JSON with unusual escaping simply compresses a little less well. The profile is trainable with `zli train --profile json`, which tunes everything except the string-content codec.

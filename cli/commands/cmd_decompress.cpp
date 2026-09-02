@@ -2,6 +2,7 @@
 
 #include "cli/commands/cmd_decompress.h"
 #include "cli/utils/util.h"
+#include "custom_parsers/dependency_registration.h"
 
 #include <chrono>
 
@@ -40,6 +41,7 @@ int cmdDecompress(const DecompressArgs& args)
     const auto start = std::chrono::steady_clock::now();
 
     DCtx dctx;
+    custom_parsers::registerCustomDecoders(dctx.get());
 
     // decompress
     std::string dstBuffer = dctx.decompressSerial(srcBuffer);

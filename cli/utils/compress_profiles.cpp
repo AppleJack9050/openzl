@@ -11,6 +11,7 @@
 #include "openzl/zl_compressor.h"
 
 #include "custom_parsers/csv/csv_profile.h"
+#include "custom_parsers/json/json_profile.h"
 #include "custom_parsers/parquet/parquet_graph.h"
 #include "custom_parsers/pytorch_model_parser.h"
 #include "custom_parsers/sddl/sddl2_profile.h"
@@ -237,6 +238,26 @@ compressProfiles()
                     return openzl::custom_parsers::
                             ZL_createGraph_genericCSVCompressorWithOptions(
                                     comp, chunkSize, true, sep, false);
+                });
+
+        std::string kJsonName = "json";
+        mp[kJsonName]         = std::make_shared<CompressProfile>(
+                kJsonName,
+                "JSON / JSON-Lines text. Pass an optional zstd level for the string content with --profile-arg <int> (default 6).",
+                [](ZL_Compressor* comp, void*, const ProfileArgs& args) {
+                    int level   = custom_parsers::kJsonDefaultLevel;
+                    auto argmap = args.map();
+                    auto it     = argmap.find("TBD");
+                    if (it != argmap.end()) {
+                        try {
+                            level = std::stoi(it->second);
+                        } catch (const std::exception&) {
+                            throw InvalidArgsException(
+                                    "The json profile level must be an integer. Pass it with --profile-arg <int>.");
+                        }
+                    }
+                    return custom_parsers::ZL_createGraph_jsonCompressor(
+                            comp, level);
                 });
 
         addLEintProfile(mp, true, 16);

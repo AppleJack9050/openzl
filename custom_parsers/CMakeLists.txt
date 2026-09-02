@@ -29,6 +29,7 @@ apply_openzl_compile_options_to_target(pytorch_model_parser)
 
 # Add subdirectories
 add_subdirectory(csv)
+add_subdirectory(json)
 add_subdirectory(parquet)
 add_subdirectory(sddl)
 add_subdirectory(shared_components)
@@ -44,6 +45,7 @@ target_link_libraries(custom_parsers
     openzl
     openzl_cpp
     csv_parser
+    json_parser
     ml_selector_graph
     parquet_graph
     shared_components
@@ -51,6 +53,7 @@ target_link_libraries(custom_parsers
 add_dependencies(custom_parsers openzl openzl_cpp xgboost_external)
 apply_openzl_compile_options_to_target(custom_parsers
     csv_parser
+    json_parser
     parquet_graph
     shared_components
 )
