@@ -1,0 +1,16 @@
+digraph stream_topo {
+S0 [shape=record, label="Stream: 0\nType: Serialized\nOutputIdx: 0\nEltWidth: 1\n#Elts: 2889011\nCSize: 681395\nShare: 100.00%"];
+S1 [shape=record, label="Stream: 1\nType: Serialized\nOutputIdx: 0\nEltWidth: 1\n#Elts: 681395\nCSize: 681395\nShare: 100.00%"];
+
+T0 [shape=Mrecord, label="zl.#start(ID: 0)\n Standard transform 0\n Header size: 0"];
+T0 -> S0[label="#0"];
+subgraph cluster_0{
+label="zl.ace#0\ntype=Parameterized";
+color=maroon
+T1 [shape=Mrecord, label="zl.private.zstd(ID: 22)\n Standard transform 1\n Header size: 0"];
+T1 -> S1[label="#0"];
+S0 -> T1[label="#0"];
+}
+T2 [shape=Mrecord, label="zl.store(ID: 0)\n Standard transform 2\n Header size: 0"];
+S1 -> T2[label="#0"];
+}

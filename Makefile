@@ -195,6 +195,10 @@ test : gtests zs2_test sddl2_test
 cli_test: zli
 	cd cli/tests && python3 cli_integration_tests.py ../../zli
 
+.PHONY: codec_reviewer_test
+codec_reviewer_test:
+	python3 -m unittest discover -s tools/codec_reviewer/tests
+
 .PHONY: check-python-format
 check-python-format:
 	@./scripts/check_python_format.sh
