@@ -14,6 +14,10 @@ namespace testing {
 std::string to_canonical_parquet(
         const std::shared_ptr<arrow::Table> table,
         std::optional<size_t> opt_group_size = std::nullopt);
+/// Writes each table as its own row group. Empty tables produce empty row
+/// groups.
+std::string to_canonical_parquet_row_groups(
+        const std::vector<std::shared_ptr<arrow::Table>>& tables);
 std::shared_ptr<arrow::Array> to_arrow_array(
         const std::vector<std::optional<std::string>>& array,
         size_t N);

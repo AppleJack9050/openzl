@@ -4,9 +4,29 @@
 
 #include <vector>
 
+#include "openzl/compress/private_nodes.h"
 #include "openzl/zl_selector.h" // ZL_AUTO_FORMAT_VERSION
 
 namespace openzl::custom_parsers {
+ZL_GraphID ZL_Compressor_registerLongRangeZstdGraph(
+        ZL_Compressor* compressor,
+        const ZL_IntParam* extraParams,
+        size_t nbExtraParams)
+{
+    std::vector<ZL_IntParam> params = { { kZstdWindowLog, kTextWindowLog },
+                                        { kZstdEnableLDM, 1 } };
+    if (nbExtraParams != 0) {
+        params.insert(params.end(), extraParams, extraParams + nbExtraParams);
+    }
+    ZL_LocalParams localParams = {};
+    localParams.intParams      = { params.data(), params.size() };
+    ZL_NodeID const zstdNode   = { ZL_PrivateStandardNodeID_zstd };
+    ZL_NodeID const zstdLongRange =
+            ZL_Compressor_cloneNode(compressor, zstdNode, &localParams);
+    return ZL_Compressor_registerStaticGraph_fromNode1o(
+            compressor, zstdLongRange, ZL_GRAPH_STORE);
+}
+
 ZL_GraphID ZL_Compressor_registerStringTokenize(ZL_Compressor* compressor)
 {
     // Note: in managed compression, the ML selector is used instead of zstd

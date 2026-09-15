@@ -48,7 +48,7 @@ std::unique_ptr<Compressor> createCompressorFromArgs(
         if (profileArgs.chunkSize()) {
             Logger::log(
                     INFO,
-                    "Chunking is not currently implemented for all profiles. Ignoring size parameter if unimplemented.\nChunking is implemented for the following profiles: csv");
+                    "Chunking is not currently implemented for all profiles. Ignoring size parameter if unimplemented.\nChunking is implemented for the following profiles: csv, parquet");
         }
         return util::createCompressorFromProfile(profileArgs);
     }

@@ -2,14 +2,20 @@
 
 #include "parquet_metadata.h"
 
+#include <stack>
 #include <stdexcept>
-#include <tuple>
 
 namespace zstrong {
 namespace parquet {
 namespace {
 
 using ColumnChunks = std::vector<ColumnChunkMetadata>;
+
+enum class FieldRepetitionType : int32_t {
+    REQUIRED = 0,
+    OPTIONAL = 1,
+    REPEATED = 2,
+};
 
 void throwIfTTypeNE(TType actual, TType expected)
 {
@@ -86,6 +92,20 @@ Encoding getEncoding(int32_t val)
             return Encoding::BYTE_STREAM_SPLIT;
         default:
             throw std::runtime_error("Invalid Parquet Encoding Type!");
+    };
+};
+
+FieldRepetitionType getRepetitionType(int32_t val)
+{
+    switch (val) {
+        case 0:
+            return FieldRepetitionType::REQUIRED;
+        case 1:
+            return FieldRepetitionType::OPTIONAL;
+        case 2:
+            return FieldRepetitionType::REPEATED;
+        default:
+            throw std::runtime_error("Invalid Parquet Repetition Type!");
     };
 };
 
@@ -278,6 +298,10 @@ struct SchemaElement {
     DataType type;
     int32_t typeWidth = 0;
 
+    /// Populated for every node except the root
+    bool hasRepetitionType             = false;
+    FieldRepetitionType repetitionType = FieldRepetitionType::REQUIRED;
+
     // Populated for non-leaf nodes
     int32_t numChildren = 0;
 };
@@ -309,6 +333,14 @@ uint32_t readSchemaElement(ThriftCompactReader& reader, SchemaElement& e)
                 read += reader.readI32(e.typeWidth);
                 break;
             }
+            case 3: /* Repetition Type */ {
+                throwIfTTypeNE(type, TType::T_I32);
+                int32_t repetitionType{};
+                read += reader.readI32(repetitionType);
+                e.repetitionType    = getRepetitionType(repetitionType);
+                e.hasRepetitionType = true;
+                break;
+            }
             case 4: /* Name */ {
                 throwIfTTypeNE(type, TType::T_STRING);
                 read += reader.readString(e.name);
@@ -335,31 +367,58 @@ void populateSchemaMetadata(
     if (schemaElements.empty()) {
         return;
     }
-    std::stack<std::tuple<int32_t, SchemaPath>> paths(
-            { std::tuple(schemaElements.front().numChildren, SchemaPath()) });
+    struct Parent {
+        int32_t numChildren;
+        SchemaPath path;
+        uint32_t maxDefinitionLevel;
+        uint32_t maxRepetitionLevel;
+    };
+    // The root is not counted in the levels of its descendants
+    std::stack<Parent> paths;
+    paths.push({ schemaElements.front().numChildren, SchemaPath(), 0, 0 });
     schemaElements.erase(schemaElements.begin());
 
     for (auto& e : schemaElements) {
         if (paths.empty()) {
             throw std::runtime_error("Invalid schema!");
         }
-        auto& [numChildren, parentPath] = paths.top();
-        auto path                       = parentPath;
+        auto& parent = paths.top();
+        if (parent.numChildren <= 0) {
+            throw std::runtime_error("Invalid schema!");
+        }
+        auto path = parent.path;
         path.push_back(e.name);
-        numChildren -= 1;
 
-        if (numChildren == 0) {
+        if (!e.hasRepetitionType) {
+            throw std::runtime_error("Missing Parquet Repetition Type!");
+        }
+        uint32_t maxDefinitionLevel = parent.maxDefinitionLevel
+                + (e.repetitionType != FieldRepetitionType::REQUIRED);
+        uint32_t maxRepetitionLevel = parent.maxRepetitionLevel
+                + (e.repetitionType == FieldRepetitionType::REPEATED);
+
+        parent.numChildren -= 1;
+        if (parent.numChildren == 0) {
             paths.pop();
         }
 
         if (!e.isLeaf) {
-            paths.emplace(e.numChildren, path);
+            if (e.numChildren <= 0) {
+                throw std::runtime_error("Invalid schema!");
+            }
+            paths.push(
+                    Parent{ e.numChildren,
+                            std::move(path),
+                            maxDefinitionLevel,
+                            maxRepetitionLevel });
             continue;
         }
 
         SchemaMetadata m = {
-            .type      = e.type,
-            .typeWidth = (uint32_t)e.typeWidth,
+            .type               = e.type,
+            .typeWidth          = (uint32_t)e.typeWidth,
+            .maxDefinitionLevel = maxDefinitionLevel,
+            .maxRepetitionLevel = maxRepetitionLevel,
         };
 
         auto it = schemaMetadata.emplace(SchemaPath(path), m);

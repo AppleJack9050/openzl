@@ -9,6 +9,18 @@
 namespace zstrong {
 namespace parquet {
 namespace testing {
+namespace {
+std::shared_ptr<::parquet::WriterProperties> canonical_writer_properties()
+{
+    return ::parquet::WriterProperties::Builder()
+            .compression(::parquet::Compression::UNCOMPRESSED)
+            ->disable_dictionary()
+            ->disable_write_page_index()
+            ->encoding(::parquet::Encoding::PLAIN)
+            ->build();
+}
+} // namespace
+
 std::string to_canonical_parquet(
         const std::shared_ptr<arrow::Table> table,
         std::optional<size_t> opt_group_size)
@@ -16,19 +28,33 @@ std::string to_canonical_parquet(
     size_t group_size =
             opt_group_size.value_or(::parquet::DEFAULT_MAX_ROW_GROUP_LENGTH);
     PARQUET_ASSIGN_OR_THROW(auto out, arrow::io::BufferOutputStream::Create());
-    auto props = ::parquet::WriterProperties::Builder()
-                         .compression(::parquet::Compression::UNCOMPRESSED)
-                         ->disable_dictionary()
-                         ->disable_write_page_index()
-                         ->encoding(::parquet::Encoding::PLAIN)
-                         ->build();
     PARQUET_THROW_NOT_OK(
             ::parquet::arrow::WriteTable(
                     *table,
                     arrow::default_memory_pool(),
                     out,
                     group_size,
-                    props));
+                    canonical_writer_properties()));
+    PARQUET_ASSIGN_OR_THROW(auto buffer, out->Finish());
+    return buffer->ToString();
+}
+
+std::string to_canonical_parquet_row_groups(
+        const std::vector<std::shared_ptr<arrow::Table>>& tables)
+{
+    PARQUET_ASSIGN_OR_THROW(auto out, arrow::io::BufferOutputStream::Create());
+    PARQUET_ASSIGN_OR_THROW(
+            auto writer,
+            ::parquet::arrow::FileWriter::Open(
+                    *tables.at(0)->schema(),
+                    arrow::default_memory_pool(),
+                    out,
+                    canonical_writer_properties()));
+    for (const auto& table : tables) {
+        PARQUET_THROW_NOT_OK(writer->WriteTable(
+                *table, ::parquet::DEFAULT_MAX_ROW_GROUP_LENGTH));
+    }
+    PARQUET_THROW_NOT_OK(writer->Close());
     PARQUET_ASSIGN_OR_THROW(auto buffer, out->Finish());
     return buffer->ToString();
 }

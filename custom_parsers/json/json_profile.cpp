@@ -11,22 +11,11 @@
 #include "openzl/codecs/zl_parse_int.h"
 #include "openzl/codecs/zl_tokenize.h"
 #include "openzl/codecs/zl_zstd.h"
-#include "openzl/compress/private_nodes.h"
 #include "openzl/zl_localParams.h"
 
 namespace openzl::custom_parsers {
 
 namespace {
-// zstd advanced parameter ids (ZSTD_cParameter in zstd.h). The zstd codec
-// forwards its LocalIntParams to ZSTD_CCtx_setParameter() by id.
-constexpr int kZstdCompressionLevel = 100; // ZSTD_c_compressionLevel
-constexpr int kZstdWindowLog        = 101; // ZSTD_c_windowLog
-constexpr int kZstdEnableLDM        = 160; // ZSTD_c_enableLongDistanceMatching
-
-// 128MB window. zstd caps the window at the input size when it knows it, so
-// small inputs do not pay for this.
-constexpr int kTextWindowLog = 27;
-
 /// Marks @p graph as a trainable placeholder: untrained it behaves exactly
 /// like @p graph, and `zli train` may replace it with something better.
 ZL_GraphID trainable(ZL_Compressor* compressor, ZL_GraphID graph)
@@ -51,18 +40,9 @@ ZL_GraphID ZL_createGraph_jsonCompressor(
 
     // String values: string -> {content (serial), lengths (numeric)}.
     // Content is where the bytes are; give it zstd with long-range matching.
-    ZL_IntParam const textParams[3] = {
-        { kZstdCompressionLevel, level },
-        { kZstdWindowLog, kTextWindowLog },
-        { kZstdEnableLDM, 1 },
-    };
-    ZL_LocalParams textLocalParams = {};
-    textLocalParams.intParams      = { textParams, 3 };
-    ZL_NodeID const zstdNode       = { ZL_PrivateStandardNodeID_zstd };
-    ZL_NodeID const zstdText =
-            ZL_Compressor_cloneNode(compressor, zstdNode, &textLocalParams);
-    ZL_GraphID const textGraph = ZL_Compressor_registerStaticGraph_fromNode1o(
-            compressor, zstdText, ZL_GRAPH_STORE);
+    ZL_IntParam const textLevel[1] = { { kZstdCompressionLevel, level } };
+    ZL_GraphID const textGraph =
+            ZL_Compressor_registerLongRangeZstdGraph(compressor, textLevel, 1);
     ZL_GraphID const valueSuccessors[2] = {
         textGraph, trainable(compressor, ZL_GRAPH_COMPRESS_GENERIC) };
     ZL_GraphID const valuesGraph = ZL_Compressor_registerStaticGraph_fromNode(

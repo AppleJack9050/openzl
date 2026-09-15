@@ -36,6 +36,12 @@ struct SchemaMetadata {
     DataType type = (DataType)-1;
     /// The size of the data type in bytes
     uint32_t typeWidth = 0;
+    /// The number of non-required fields on the path. Definition levels are
+    /// only stored in data pages when this is non-zero.
+    uint32_t maxDefinitionLevel = 0;
+    /// The number of repeated fields on the path. Repetition levels are only
+    /// stored in data pages when this is non-zero.
+    uint32_t maxRepetitionLevel = 0;
 };
 
 struct FileMetadata {

@@ -21,6 +21,7 @@
 #include "tools/io/InputFile.h"
 #include "tools/ml_selector/ml_selector_graph.h"
 #include "tools/sddl/compiler/Compiler.h"
+#include <limits>
 
 namespace openzl::cli {
 namespace {
@@ -271,12 +272,19 @@ compressProfiles()
         mp[kParquetName]         = std::make_shared<CompressProfile>(
                 kParquetName,
                 "Parquet in the canonical format (no compression, plain encoding)",
-                [](ZL_Compressor* comp, void*, const ProfileArgs&) {
-                    auto clustering = ZS2_createGraph_genericClustering(comp);
-                    return ZL_Parquet_registerGraph_withChunkSize(
-                            comp,
-                            clustering,
+                [](ZL_Compressor* comp, void*, const ProfileArgs& args) {
+                    const auto chunkSize = args.chunkSize().value_or(
                             custom_parsers::kDefaultChunkSize);
+                    if (chunkSize
+                        > static_cast<size_t>(std::numeric_limits<int>::max())) {
+                        throw InvalidArgsException(
+                                "--chunk-size-mb is too large for the parquet profile (max 2147).");
+                    }
+                    auto clustering =
+                            ZS2_createGraph_genericClustering_withLongRangeSerial(
+                                    comp);
+                    return ZL_Parquet_registerGraph_withChunkSize(
+                            comp, clustering, static_cast<int>(chunkSize));
                 });
 
         std::string kSDDLName = "sddl";

@@ -121,28 +121,44 @@ ZL_Report lexPageHeader(
     // If we are in a data page, include the repetition and definition levels in
     // the header
     if (lexer->pageHeader->pageType == PageType::DATA_PAGE) {
-        ZL_ERR_IF_NE(
-                (int)lexer->pageHeader->rl_encoding,
-                (int)Encoding::RLE,
-                node_invalid_input);
-        ZL_ERR_IF_NE(
-                (int)lexer->pageHeader->dl_encoding,
-                (int)Encoding::RLE,
-                node_invalid_input);
-        // Repetition and Definition levels
-        ZL_ERR_IF_LT(getRemaining(lexer), 4, node_invalid_input);
-        auto size = ZL_readLE32(lexer->currPtr);
-        advance(4);
-        ZL_ERR_IF_LT(getRemaining(lexer), size, node_invalid_input);
-        advance(size);
+        auto& chunkMeta = getChunkMeta(lexer);
+        auto schemaMeta = getSchemaMeta(lexer, chunkMeta.path_in_schema);
+        ZL_ERR_IF_NULL(schemaMeta, GENERIC, "Unknown schema path");
+
+        // The page stores the repetition levels, then the definition levels,
+        // then the values. Each level block is only present when the column's
+        // max level is non-zero, and is prefixed by its 4-byte length.
+        struct {
+            uint32_t maxLevel;
+            Encoding encoding;
+        } const levels[] = {
+            { schemaMeta->maxRepetitionLevel, lexer->pageHeader->rl_encoding },
+            { schemaMeta->maxDefinitionLevel, lexer->pageHeader->dl_encoding },
+        };
+        size_t levelsSize = 0;
+        for (const auto& level : levels) {
+            if (level.maxLevel == 0) {
+                continue;
+            }
+            ZL_ERR_IF_NE(
+                    (int)level.encoding,
+                    (int)Encoding::RLE,
+                    node_invalid_input);
+            ZL_ERR_IF_LT(getRemaining(lexer), 4, node_invalid_input);
+            auto size = ZL_readLE32(lexer->currPtr);
+            advance(4);
+            ZL_ERR_IF_LT(getRemaining(lexer), size, node_invalid_input);
+            advance(size);
+            levelsSize += (size_t)size + 4;
+        }
 
         // Adjust the expected data page bytes
+        ZL_ERR_IF_LT(lexer->pageHeader->numBytes, 0, node_invalid_input);
         ZL_ERR_IF_LT(
-
                 (size_t)lexer->pageHeader->numBytes,
-                size + 4,
+                levelsSize,
                 node_invalid_input);
-        lexer->pageHeader->numBytes -= size + 4;
+        lexer->pageHeader->numBytes -= (int32_t)levelsSize;
     }
 
     lexer->chunkLexed += out->size;
@@ -212,6 +228,10 @@ ZL_Report lexDataPage(
             (int)lexer->pageHeader->encoding,
             (int)Encoding::PLAIN,
             node_invalid_input);
+    ZL_ERR_IF_LT(
+            getRemaining(lexer),
+            (size_t)lexer->pageHeader->numBytes,
+            node_invalid_input);
     out->type = ZL_ParquetTokenType_DataPage;
     out->size = lexer->pageHeader->numBytes;
     out->ptr  = lexer->currPtr;
@@ -249,11 +269,18 @@ lexOne(ZL_ParquetLexer* lexer, ZL_ParquetToken* out, ZL_ErrorContext* errCtx)
 
     /// If we are not in the header or footer, we are in a column
     /// chunk. Check how many bytes are left in the current chunk
-    /// and move onto the next one if needed.
+    /// and move onto the next one if needed. Empty row groups have
+    /// zero-byte column chunks, which are skipped.
     auto chunkRemaining = getChunkMeta(lexer).numBytes - lexer->chunkLexed;
-    if (chunkRemaining == 0) {
+    while (chunkRemaining == 0) {
         lexer->chunkIdx++;
         lexer->chunkLexed = 0;
+        // Bytes remain before the footer that belong to no column chunk
+        ZL_ERR_IF_GE(
+                lexer->chunkIdx,
+                lexer->fileMetadata->columnChunks.size(),
+                node_invalid_input);
+        chunkRemaining = getChunkMeta(lexer).numBytes;
     }
     ZL_ERR_IF_LT(chunkRemaining, 0, node_invalid_input);
     ZL_ERR_IF_LT(
