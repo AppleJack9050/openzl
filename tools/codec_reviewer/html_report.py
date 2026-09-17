@@ -1,13 +1,15 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
-"""JSON export of an analysis, and the self-contained interactive HTML report."""
+"""JSON export of an analysis, and the self-contained interactive HTML report
+(with ratio-vs-speed results when there are any)."""
 
 from __future__ import annotations
 
 import json
 import os
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
+import pareto
 from pipelines import (
     allow_deep_trees,
     Analysis,
@@ -29,6 +31,9 @@ MAX_CHUNK_VIEWS = 64
 TEMPLATE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "report_template.html"
 )
+TOOL = "tools/codec_reviewer"
+BENCH_MARKER = "__BENCH__"
+MARKERS = ("__TITLE__", "__DATA__", BENCH_MARKER)
 
 
 def _node(n: NodeRuns) -> Dict[str, object]:
@@ -190,7 +195,7 @@ def report_data(
         else:
             note = f"Per-chunk views are left out: the trace has more than {MAX_CHUNK_VIEWS} chunks."
     return {
-        "tool": "tools/codec_reviewer",
+        "tool": TOOL,
         "file": name,
         "format": trace.format,
         "trace_version": trace.trace_version,
@@ -218,30 +223,80 @@ def write_json(path: str, data: Dict[str, object]) -> None:
         f.write("\n")
 
 
+def _script_json(text: str) -> str:
+    # Strings from traces and results end up inside <script>; with <, > and &
+    # escaped they cannot end the script or open a comment there.
+    return text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
+def _page_title(data: Dict[str, object]) -> str:
+    if data.get("bench_only"):
+        title = (
+            f"Ratio vs speed: {data['file']}" if data.get("file") else "Ratio vs speed"
+        )
+    else:
+        title = (
+            f"Codec review: {data['file']}" if data.get("file") else "Codec reviewer"
+        )
+    # A file name that is not valid text (Linux allows any bytes) still makes a page.
+    return title.encode("utf-8", "replace").decode("utf-8")
+
+
 @allow_deep_trees
-def render_html(data: Dict[str, object]) -> str:
+def render_parts(data: Dict[str, object]) -> Tuple[str, str]:
+    """The page before and after the benchmark marker, with title and data filled in."""
     with open(TEMPLATE, encoding="utf-8") as f:
         template = f.read()
-    # Trace strings (codec names, error messages) end up inside <script>; with
-    # <, > and & escaped they cannot end the script or open a comment there.
-    payload = (
-        json.dumps(data, separators=(",", ":"))
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-        .replace("&", "\\u0026")
-    )
-    page_title = (
-        f"Codec review: {data['file']}" if data.get("file") else "Codec reviewer"
-    )
-    escaped = page_title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    values = {"__TITLE__": escaped, "__DATA__": payload}
-    for marker in values:
+    for marker in MARKERS:
         if template.count(marker) != 1:
             raise ValueError(f"{TEMPLATE} must contain {marker} exactly once")
-    # One pass, so a marker spelled inside a substituted value stays text.
-    return re.sub("__TITLE__|__DATA__", lambda m: values[m.group(0)], template)
+    page_title = _page_title(data)
+    values = {
+        "__TITLE__": page_title.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;"),
+        "__DATA__": _script_json(json.dumps(data, separators=(",", ":"))),
+    }
+
+    def fill(part: str) -> str:
+        # One pass, so a marker spelled inside a substituted value stays text.
+        return re.sub("__TITLE__|__DATA__", lambda m: values[m.group(0)], part)
+
+    # Split the template, never a filled-in page: a trace name may spell a marker.
+    head, tail = template.split(BENCH_MARKER)
+    return fill(head), fill(tail)
 
 
-def write_html(path: str, data: Dict[str, object]) -> None:
+def bench_payload(doc: Optional[Dict[str, object]]) -> str:
+    """The JavaScript value that replaces the benchmark marker."""
+    return "null" if doc is None else _script_json(pareto.dumps(doc))
+
+
+def render_html(
+    data: Dict[str, object], bench: Optional[Dict[str, object]] = None
+) -> str:
+    """The self-contained page; ``bench`` is a normalized benchmark document."""
+    head, tail = render_parts(data)
+    return head + bench_payload(bench) + tail
+
+
+def write_html(
+    path: str, data: Dict[str, object], bench: Optional[Dict[str, object]] = None
+) -> None:
     with open(path, "w", encoding="utf-8") as f:
-        f.write(render_html(data))
+        f.write(render_html(data, bench))
+
+
+def bench_only_data(bench: Dict[str, object]) -> Dict[str, object]:
+    """Page data for results shown without a trace."""
+    return {
+        "tool": TOOL,
+        "file": bench["input"]["name"],
+        "format": None,
+        "trace_version": None,
+        "chunks": [],
+        "selections": [],
+        "note": "",
+        "empty": True,
+        "bench_only": True,
+    }

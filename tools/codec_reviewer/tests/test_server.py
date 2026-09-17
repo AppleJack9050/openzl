@@ -20,12 +20,29 @@ TOOL = os.path.dirname(HERE)
 sys.path[:0] = [TOOL, HERE]
 
 import codec_reviewer  # noqa: E402
+import html_report  # noqa: E402
+import pareto  # noqa: E402
 import review_server  # noqa: E402
 import trace_builder as tb  # noqa: E402
 
 DATA = os.path.join(HERE, "data")
 SENSORS = os.path.join(DATA, "sensors_chunks.cbor.gz")
 SERIAL_DOT = os.path.join(DATA, "serial.dot")
+# Measured on the input of SENSORS (sensors.parquet); its trace link says so.
+BENCH = os.path.join(DATA, "bench_sensors.json")
+
+
+def bench_doc():
+    with open(BENCH, "rb") as f:
+        return pareto.loads(f.read())
+
+
+def page_bench(body):
+    """The results embedded in a served page (None for null)."""
+    text = body.decode("utf-8")
+    start = text.index("const BENCH = ") + len("const BENCH = ")
+    value, _ = json.JSONDecoder().raw_decode(text, start)
+    return value
 
 
 def read(path):
@@ -64,6 +81,21 @@ class Server:
         sent = {review_server.UPLOAD_HEADER: "upload", "X-Trace-Name": name}
         sent.update(headers)
         status, _, body = self.request("POST", "/api/reviews", raw, sent)
+        return status, json.loads(body)
+
+    def send_results(self, raw, review_id=None, **headers):
+        sent = {
+            review_server.UPLOAD_HEADER: "benchmark",
+            "Content-Type": "application/json",
+            "X-Trace-Name": "sensors.parquet.bench.json",
+        }
+        sent.update(headers)
+        path = (
+            "/api/reviews"
+            if review_id is None
+            else f"/api/reviews/{review_id}/benchmark"
+        )
+        status, _, body = self.request("POST", path, raw, sent)
         return status, json.loads(body)
 
 
@@ -244,6 +276,238 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(status, 403)
             self.assertIn("127.0.0.1:9999", answer["error"])
             self.assertIn("proxy", answer["error"])
+
+
+class ResultsTest(unittest.TestCase):
+    def test_results_on_reviews(self):
+        raw = pareto.dumps(bench_doc()).encode()
+        with Server() as server:
+            server.upload("sensors_chunks.cbor.gz", read(SENSORS))
+            server.upload("serial.dot", read(SERIAL_DOT))
+            _, _, before = server.request("GET", "/r/1")
+            self.assertIsNone(page_bench(before))
+
+            self.assertEqual(
+                server.send_results(raw, 1), (200, {"id": 1, "url": "r/1"})
+            )
+            _, _, page = server.request("GET", "/r/1")
+            shown = page_bench(page)
+            # The results measured on this trace's input mark its traced run.
+            self.assertEqual(shown["trace_link"]["state"], "linked")
+            self.assertEqual(shown["frontiers"], bench_doc()["frontiers"])
+            # Only the results changed in the page.
+            payload = html_report.bench_payload(shown).encode()
+            self.assertEqual(page.replace(payload, b"null", 1), before)
+
+            # On another trace they are shown, but mark nothing.
+            self.assertEqual(server.send_results(raw, 2)[0], 200)
+            shown = page_bench(server.request("GET", "/r/2")[2])
+            self.assertEqual(shown["trace_link"]["state"], "mismatch")
+            self.assertIn(
+                "not the trace recorded with these results", shown["notes"][-1]
+            )
+
+            # Results alone get a page of their own.
+            self.assertEqual(server.send_results(raw), (201, {"id": 3, "url": "r/3"}))
+            _, _, page = server.request("GET", "/r/3")
+            self.assertIn(b'"bench_only":true', page)
+            self.assertIn(b"<title>Ratio vs speed: sensors.parquet</title>", page)
+            self.assertEqual(page_bench(page)["trace_link"]["state"], "none")
+
+            _, _, body = server.request("GET", "/api/reviews")
+            listing = json.loads(body)
+            self.assertIn("benchmark", listing["features"])
+            self.assertEqual(
+                listing["max_bench_upload"], review_server.MAX_BENCH_UPLOAD
+            )
+            self.assertEqual(
+                [(r["id"], r["name"], bool(r["bench"])) for r in listing["reviews"]],
+                [
+                    (3, "sensors.parquet", True),
+                    (2, "serial.dot", True),
+                    (1, "sensors_chunks.cbor.gz", True),
+                ],
+            )
+            self.assertEqual(
+                listing["reviews"][0]["bench"], pareto.summary(bench_doc())
+            )
+
+            status, headers, body = server.request("GET", "/api/reviews/1/benchmark")
+            self.assertEqual(status, 200)
+            self.assertIn("sensors.parquet.bench.json", headers["Content-Disposition"])
+            self.assertTrue(headers["Content-Disposition"].startswith("attachment;"))
+            self.assertEqual(json.loads(body)["trace_link"]["state"], "linked")
+            # The download opens again as results.
+            self.assertEqual(pareto.loads(body)["points"], bench_doc()["points"])
+
+    def test_results_keep_their_link_when_moved(self):
+        raw = pareto.dumps(bench_doc()).encode()
+        with Server() as server:
+            server.upload("serial.dot", read(SERIAL_DOT))
+            self.assertEqual(server.send_results(raw, 1)[0], 200)
+            self.assertEqual(server.send_results(raw)[0], 201)
+            server.upload("sensors_chunks.cbor.gz", read(SENSORS))
+
+            # On another trace the sentence compares that trace with the recorded one.
+            link = page_bench(server.request("GET", "/r/1")[2])["trace_link"]
+            self.assertEqual(link["state"], "mismatch")
+            totals = server.store.entries()[2]
+            self.assertEqual(
+                (link["given_input_bytes"], link["given_stream_bytes"]),
+                (totals["input"], totals["bytes"]),
+            )
+            # Downloads return the results as sent, so they mark the traced run
+            # again when opened on their own trace.
+            for review_id in (1, 2):
+                _, _, body = server.request(
+                    "GET", f"/api/reviews/{review_id}/benchmark"
+                )
+                self.assertEqual(json.loads(body)["trace_link"]["state"], "linked")
+                self.assertEqual(server.send_results(body, 3)[0], 200)
+                shown = page_bench(server.request("GET", "/r/3")[2])
+                self.assertEqual(shown["trace_link"]["state"], "linked")
+                self.assertEqual(shown["notes"], bench_doc()["notes"])
+
+    def test_fit_results_measured_next_to_another_trace(self):
+        doc = bench_doc()
+        recorded = (doc["input"]["bytes"], doc["trace_link"]["stream_bytes"])
+        given = (2_889_011, 681_395)
+        measured = dict(
+            doc,
+            trace_link=dict(
+                doc["trace_link"],
+                state="mismatch",
+                given_input_bytes=given[0],
+                given_stream_bytes=given[1],
+            ),
+        )
+        # Shown with the given trace: unchanged.
+        shown = review_server.fit_benchmark(measured, given)
+        self.assertEqual(shown["trace_link"], measured["trace_link"])
+        self.assertEqual(shown["notes"], doc["notes"])
+        # Shown with the recorded trace: that is the traced run.
+        shown = review_server.fit_benchmark(measured, recorded)
+        self.assertEqual(shown["trace_link"]["state"], "linked")
+        # Shown with a third trace: the sentence names that trace.
+        third = (2_889_011, 12_345)
+        shown = review_server.fit_benchmark(measured, third)
+        link = shown["trace_link"]
+        self.assertEqual(link["state"], "mismatch")
+        self.assertEqual((link["given_input_bytes"], link["given_stream_bytes"]), third)
+        self.assertIn("12,345 B in streams", shown["notes"][-1])
+        # Without recorded stream bytes nothing becomes the traced run.
+        blind = dict(
+            measured, trace_link=dict(measured["trace_link"], stream_bytes=None)
+        )
+        shown = review_server.fit_benchmark(blind, (recorded[0], None))
+        self.assertEqual(shown["trace_link"]["state"], "mismatch")
+
+    def test_new_results_rename_a_results_page(self):
+        doc = bench_doc()
+        other = json.loads(pareto.dumps(doc))
+        other["input"]["name"] = "other.parquet"
+        with Server() as server:
+            server.send_results(pareto.dumps(doc).encode())
+            self.assertEqual(server.send_results(json.dumps(other).encode(), 1)[0], 200)
+            _, _, page = server.request("GET", "/r/1")
+            self.assertIn(b"<title>Ratio vs speed: other.parquet</title>", page)
+            self.assertIn(b'"file":"other.parquet"', page)
+            self.assertNotIn(b'"file":"sensors.parquet"', page)
+            (entry,) = server.store.entries()
+            self.assertEqual(entry["name"], "other.parquet")
+            self.assertEqual(entry["bench"]["input"], "other.parquet")
+
+    def test_results_with_names_that_are_not_text(self):
+        raw = pareto.dumps(bench_doc()).replace(
+            '"name":"sensors.parquet"', '"name":"caf\\udce9.parquet"'
+        )
+        with Server() as server:
+            status, answer = server.send_results(raw.encode())
+            self.assertEqual(status, 201, answer)
+            status, headers, body = server.request("GET", "/api/reviews/1/benchmark")
+            self.assertEqual(status, 200)
+            self.assertIn("caf%3F.parquet.bench.json", headers["Content-Disposition"])
+            self.assertEqual(server.request("GET", "/r/1")[0], 200)
+
+    def test_results_uploads_are_checked(self):
+        doc = bench_doc()
+        raw = pareto.dumps(doc).encode()
+        store = review_server.ReviewStore(limit=1)
+        limit = len(raw) + 64
+        with Server(store=store, max_bench_upload=limit) as server:
+            server.upload("serial.dot", read(SERIAL_DOT))
+            self.assertEqual(server.request("GET", "/api/reviews/1/benchmark")[0], 404)
+            for headers, status in (
+                ({review_server.UPLOAD_HEADER: "upload"}, 403),
+                ({review_server.UPLOAD_HEADER: ""}, 403),
+                ({"Sec-Fetch-Site": "cross-site"}, 403),
+                ({"Origin": "http://evil.example"}, 403),
+                ({"Content-Type": "text/plain"}, 415),
+            ):
+                with self.subTest(headers=headers):
+                    answer = server.send_results(raw, 1, **headers)
+                    self.assertEqual(answer[0], status, answer)
+            status, answer = server.send_results(raw + b" " * 65, 1)
+            self.assertEqual(status, 413)
+            self.assertIn("results file", answer["error"])
+
+            tampered = json.loads(raw)
+            tampered["frontiers"] = {
+                "c": {"subsets": {}},
+                "cd": {"subsets": {}, "beaten_by": {"x": "y"}},
+            }
+            tampered["points"][0]["c_speed"] = 1e9
+            self.assertEqual(
+                server.send_results(json.dumps(tampered).encode(), 1)[0], 200
+            )
+            # Frontiers sent along are ignored and computed again.
+            shown = store.bench(1)
+            everything = pareto.subset_key(shown, [x["id"] for x in shown["series"]])
+            fastest = shown["frontiers"]["c"]["subsets"][everything]
+            self.assertIn(tampered["points"][0]["id"], fastest)
+            self.assertEqual(set(shown["frontiers"]), {"c", "d", "cd"})
+            self.assertEqual(
+                shown["frontiers"], pareto.frontiers(shown), "recomputed frontiers"
+            )
+
+            for body, message in (
+                (b"{not json", "not a results file"),
+                (raw.replace(b'"version":1', b'"version":2'), "not a results file"),
+                (
+                    raw.replace(b'"elapsed_s":', b'"elapsed_s":NaN,"x":', 1),
+                    "not a results file",
+                ),
+                (b"\xff\xfe", "not a results file"),
+            ):
+                with self.subTest(body=body[:20]):
+                    status, answer = server.send_results(body, 1)
+                    self.assertEqual(status, 400, answer)
+                    self.assertIn(message, answer["error"])
+
+            # A review that is no longer kept cannot take results.
+            server.upload("serial.dot", read(SERIAL_DOT))
+            status, answer = server.send_results(raw, 1)
+            self.assertEqual(status, 404)
+            self.assertIn("no longer kept", answer["error"])
+            self.assertEqual(server.send_results(raw, 99)[0], 404)
+            self.assertEqual(server.request("GET", "/api/reviews/99/benchmark")[0], 404)
+
+    def test_send_results_from_the_command_line_helpers(self):
+        doc = bench_doc()
+        with Server() as server:
+            ok, url, review_id = review_server.add_trace(
+                "127.0.0.1", server.port, "sensors_chunks.cbor.gz", read(SENSORS)
+            )
+            self.assertTrue(ok, url)
+            self.assertEqual(review_id, 1)
+            self.assertTrue(url.endswith("/r/1"))
+            ok, url = review_server.send_benchmark("127.0.0.1", server.port, doc, 1)
+            self.assertEqual((ok, url), (True, f"http://127.0.0.1:{server.port}/r/1"))
+            ok, url = review_server.send_benchmark("127.0.0.1", server.port, doc)
+            self.assertEqual((ok, url), (True, f"http://127.0.0.1:{server.port}/r/2"))
+            ok, message = review_server.send_benchmark("127.0.0.1", server.port, doc, 7)
+            self.assertFalse(ok)
+            self.assertIn("no longer kept", message)
 
 
 class CommandLineTest(unittest.TestCase):

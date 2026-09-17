@@ -1,0 +1,1960 @@
+{
+ "format": "codec_reviewer.benchmark",
+ "version": 1,
+ "complete": true,
+ "stopped": null,
+ "created": "2026-09-16T12:00:00Z",
+ "elapsed_s": 41.2,
+ "input": {
+  "name": "sensors.parquet",
+  "bytes": 2889011,
+  "sha256": "82ae5369d5273bde55471c118ef1ee88a060776427ce2a6b9897c22790935c45"
+ },
+ "machine": {
+  "cpu": "sample CPU",
+  "logical_cpus": 16,
+  "kernel": "6.8.0-136-generic",
+  "python": "3.13.14",
+  "governor": null,
+  "core": 4,
+  "core_choice": "fixed",
+  "pin": "taskset"
+ },
+ "tools": {
+  "zli": {
+   "path": "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+   "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "bytes": 17875328,
+   "version": "zstrong-cli version 0.1",
+   "build_dir": "a847d4ccf764f93fd4db504e64368ed8",
+   "note": "built without -march: OpenZL SIMD kernels off"
+  },
+  "zstd": {
+   "path": "~/miniforge3/bin/zstd",
+   "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+   "bytes": 1,
+   "version": "1.5.7"
+  }
+ },
+ "settings": {
+  "levels": "fast=5,fast=1,1-9,12,15,19,22",
+  "rounds": 1,
+  "min_time_s": 0.5,
+  "quick": false,
+  "timeout_s": 900,
+  "env": {}
+ },
+ "series": [
+  {
+   "id": "zli:parquet",
+   "tool": "zli",
+   "label": "OpenZL -p parquet",
+   "args": [
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1"
+   ],
+   "slot": 0
+  },
+  {
+   "id": "zli:serial",
+   "tool": "zli",
+   "label": "OpenZL -p serial",
+   "args": [
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1"
+   ],
+   "slot": 1
+  },
+  {
+   "id": "zstd",
+   "tool": "zstd",
+   "label": "zstd",
+   "args": [
+    "--single-thread"
+   ],
+   "slot": 0
+  },
+  {
+   "id": "zstd:long27",
+   "tool": "zstd",
+   "label": "zstd --long=27",
+   "args": [
+    "--single-thread",
+    "--long=27"
+   ],
+   "slot": 1
+  }
+ ],
+ "points": [
+  {
+   "id": "zstd/-5",
+   "series": "zstd",
+   "level": -5,
+   "level_label": "--fast=5",
+   "status": "ok",
+   "error": null,
+   "bytes": 1171693,
+   "c_speed": 589.03,
+   "d_speed": 1758.5,
+   "c_samples": [
+    589.03
+   ],
+   "d_samples": [
+    1758.5
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--fast=5",
+    "-b",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd/-1",
+   "series": "zstd",
+   "level": -1,
+   "level_label": "--fast=1",
+   "status": "ok",
+   "error": null,
+   "bytes": 845123,
+   "c_speed": 467.42,
+   "d_speed": 1446.1,
+   "c_samples": [
+    467.42
+   ],
+   "d_samples": [
+    1446.1
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--fast=1",
+    "-b",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/1",
+   "series": "zli:parquet",
+   "level": 1,
+   "level_label": "-l 1",
+   "status": "ok",
+   "error": null,
+   "bytes": 537684,
+   "c_speed": 282.2,
+   "d_speed": 1690.82,
+   "c_samples": [
+    282.2
+   ],
+   "d_samples": [
+    1690.82
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "1",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/1",
+   "series": "zli:serial",
+   "level": 1,
+   "level_label": "-l 1",
+   "status": "ok",
+   "error": null,
+   "bytes": 790453,
+   "c_speed": 352.14,
+   "d_speed": 1240.0,
+   "c_samples": [
+    352.14
+   ],
+   "d_samples": [
+    1240.0
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "1",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/1",
+   "series": "zstd",
+   "level": 1,
+   "level_label": "-1",
+   "status": "ok",
+   "error": null,
+   "bytes": 790425,
+   "c_speed": 474.25,
+   "d_speed": 1587.1,
+   "c_samples": [
+    474.25
+   ],
+   "d_samples": [
+    1587.1
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b1",
+    "-e1",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/1",
+   "series": "zstd:long27",
+   "level": 1,
+   "level_label": "-1",
+   "status": "ok",
+   "error": null,
+   "bytes": 787456,
+   "c_speed": 372.24,
+   "d_speed": 1636.0,
+   "c_samples": [
+    372.24
+   ],
+   "d_samples": [
+    1636.0
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b1",
+    "-e1",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/2",
+   "series": "zli:parquet",
+   "level": 2,
+   "level_label": "-l 2",
+   "status": "ok",
+   "error": null,
+   "bytes": 539316,
+   "c_speed": 249.99,
+   "d_speed": 1631.1,
+   "c_samples": [
+    249.99
+   ],
+   "d_samples": [
+    1631.1
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "2",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/2",
+   "series": "zli:serial",
+   "level": 2,
+   "level_label": "-l 2",
+   "status": "ok",
+   "error": null,
+   "bytes": 732997,
+   "c_speed": 309.11,
+   "d_speed": 1016.07,
+   "c_samples": [
+    309.11
+   ],
+   "d_samples": [
+    1016.07
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "2",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/2",
+   "series": "zstd",
+   "level": 2,
+   "level_label": "-2",
+   "status": "ok",
+   "error": null,
+   "bytes": 732969,
+   "c_speed": 396.46,
+   "d_speed": 1267.3,
+   "c_samples": [
+    396.46
+   ],
+   "d_samples": [
+    1267.3
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b2",
+    "-e2",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/3",
+   "series": "zli:parquet",
+   "level": 3,
+   "level_label": "-l 3",
+   "status": "ok",
+   "error": null,
+   "bytes": 543520,
+   "c_speed": 245.5,
+   "d_speed": 1612.25,
+   "c_samples": [
+    245.5
+   ],
+   "d_samples": [
+    1612.25
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "3",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/3",
+   "series": "zli:serial",
+   "level": 3,
+   "level_label": "-l 3",
+   "status": "ok",
+   "error": null,
+   "bytes": 713097,
+   "c_speed": 258.05,
+   "d_speed": 1024.46,
+   "c_samples": [
+    258.05
+   ],
+   "d_samples": [
+    1024.46
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "3",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/3",
+   "series": "zstd",
+   "level": 3,
+   "level_label": "-3",
+   "status": "ok",
+   "error": null,
+   "bytes": 713069,
+   "c_speed": 319.26,
+   "d_speed": 1274.6,
+   "c_samples": [
+    319.26
+   ],
+   "d_samples": [
+    1274.6
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b3",
+    "-e3",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/3",
+   "series": "zstd:long27",
+   "level": 3,
+   "level_label": "-3",
+   "status": "ok",
+   "error": null,
+   "bytes": 705354,
+   "c_speed": 259.1,
+   "d_speed": 1332.9,
+   "c_samples": [
+    259.1
+   ],
+   "d_samples": [
+    1332.9
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b3",
+    "-e3",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/4",
+   "series": "zli:parquet",
+   "level": 4,
+   "level_label": "-l 4",
+   "status": "ok",
+   "error": null,
+   "bytes": 577403,
+   "c_speed": 122.96,
+   "d_speed": 1058.43,
+   "c_samples": [
+    122.96
+   ],
+   "d_samples": [
+    1058.43
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "4",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/4",
+   "series": "zli:serial",
+   "level": 4,
+   "level_label": "-l 4",
+   "status": "ok",
+   "error": null,
+   "bytes": 710864,
+   "c_speed": 238.36,
+   "d_speed": 1019.77,
+   "c_samples": [
+    238.36
+   ],
+   "d_samples": [
+    1019.77
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "4",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/4",
+   "series": "zstd",
+   "level": 4,
+   "level_label": "-4",
+   "status": "ok",
+   "error": null,
+   "bytes": 710836,
+   "c_speed": 292.55,
+   "d_speed": 1271.4,
+   "c_samples": [
+    292.55
+   ],
+   "d_samples": [
+    1271.4
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b4",
+    "-e4",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/5",
+   "series": "zli:parquet",
+   "level": 5,
+   "level_label": "-l 5",
+   "status": "ok",
+   "error": null,
+   "bytes": 567939,
+   "c_speed": 115.9,
+   "d_speed": 1097.82,
+   "c_samples": [
+    115.9
+   ],
+   "d_samples": [
+    1097.82
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "5",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/5",
+   "series": "zli:serial",
+   "level": 5,
+   "level_label": "-l 5",
+   "status": "ok",
+   "error": null,
+   "bytes": 692192,
+   "c_speed": 145.95,
+   "d_speed": 1050.76,
+   "c_samples": [
+    145.95
+   ],
+   "d_samples": [
+    1050.76
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "5",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/5",
+   "series": "zstd",
+   "level": 5,
+   "level_label": "-5",
+   "status": "ok",
+   "error": null,
+   "bytes": 692164,
+   "c_speed": 166.93,
+   "d_speed": 1324.3,
+   "c_samples": [
+    166.93
+   ],
+   "d_samples": [
+    1324.3
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b5",
+    "-e5",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/6",
+   "series": "zli:parquet",
+   "level": 6,
+   "level_label": "-l 6",
+   "status": "ok",
+   "error": null,
+   "bytes": 562193,
+   "c_speed": 111.92,
+   "d_speed": 1124.2,
+   "c_samples": [
+    111.92
+   ],
+   "d_samples": [
+    1124.2
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "6",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/6",
+   "series": "zli:serial",
+   "level": 6,
+   "level_label": "-l 6",
+   "status": "ok",
+   "error": null,
+   "bytes": 681426,
+   "c_speed": 104.81,
+   "d_speed": 1085.49,
+   "c_samples": [
+    104.81
+   ],
+   "d_samples": [
+    1085.49
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "6",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/6",
+   "series": "zstd",
+   "level": 6,
+   "level_label": "-6",
+   "status": "ok",
+   "error": null,
+   "bytes": 681398,
+   "c_speed": 115.61,
+   "d_speed": 1406.6,
+   "c_samples": [
+    115.61
+   ],
+   "d_samples": [
+    1406.6
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b6",
+    "-e6",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/6",
+   "series": "zstd:long27",
+   "level": 6,
+   "level_label": "-6",
+   "status": "ok",
+   "error": null,
+   "bytes": 682252,
+   "c_speed": 107.99,
+   "d_speed": 1445.3,
+   "c_samples": [
+    107.99
+   ],
+   "d_samples": [
+    1445.3
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b6",
+    "-e6",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/7",
+   "series": "zli:parquet",
+   "level": 7,
+   "level_label": "-l 7",
+   "status": "ok",
+   "error": null,
+   "bytes": 560396,
+   "c_speed": 106.05,
+   "d_speed": 1125.21,
+   "c_samples": [
+    106.05
+   ],
+   "d_samples": [
+    1125.21
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "7",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/7",
+   "series": "zli:serial",
+   "level": 7,
+   "level_label": "-l 7",
+   "status": "ok",
+   "error": null,
+   "bytes": 673338,
+   "c_speed": 92.97,
+   "d_speed": 1111.97,
+   "c_samples": [
+    92.97
+   ],
+   "d_samples": [
+    1111.97
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "7",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/7",
+   "series": "zstd",
+   "level": 7,
+   "level_label": "-7",
+   "status": "ok",
+   "error": null,
+   "bytes": 673310,
+   "c_speed": 100.4,
+   "d_speed": 1445.8,
+   "c_samples": [
+    100.4
+   ],
+   "d_samples": [
+    1445.8
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b7",
+    "-e7",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/8",
+   "series": "zli:parquet",
+   "level": 8,
+   "level_label": "-l 8",
+   "status": "ok",
+   "error": null,
+   "bytes": 559403,
+   "c_speed": 101.91,
+   "d_speed": 1121.57,
+   "c_samples": [
+    101.91
+   ],
+   "d_samples": [
+    1121.57
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "8",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/8",
+   "series": "zli:serial",
+   "level": 8,
+   "level_label": "-l 8",
+   "status": "ok",
+   "error": null,
+   "bytes": 670441,
+   "c_speed": 74.64,
+   "d_speed": 1132.42,
+   "c_samples": [
+    74.64
+   ],
+   "d_samples": [
+    1132.42
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "8",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/8",
+   "series": "zstd",
+   "level": 8,
+   "level_label": "-8",
+   "status": "ok",
+   "error": null,
+   "bytes": 670413,
+   "c_speed": 78.03,
+   "d_speed": 1482.1,
+   "c_samples": [
+    78.03
+   ],
+   "d_samples": [
+    1482.1
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b8",
+    "-e8",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/9",
+   "series": "zli:parquet",
+   "level": 9,
+   "level_label": "-l 9",
+   "status": "ok",
+   "error": null,
+   "bytes": 559314,
+   "c_speed": 99.06,
+   "d_speed": 1130.93,
+   "c_samples": [
+    99.06
+   ],
+   "d_samples": [
+    1130.93
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "9",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/9",
+   "series": "zli:serial",
+   "level": 9,
+   "level_label": "-l 9",
+   "status": "ok",
+   "error": null,
+   "bytes": 669302,
+   "c_speed": 72.21,
+   "d_speed": 1127.19,
+   "c_samples": [
+    72.21
+   ],
+   "d_samples": [
+    1127.19
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "9",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/9",
+   "series": "zstd",
+   "level": 9,
+   "level_label": "-9",
+   "status": "ok",
+   "error": null,
+   "bytes": 669274,
+   "c_speed": 76.63,
+   "d_speed": 1484.0,
+   "c_samples": [
+    76.63
+   ],
+   "d_samples": [
+    1484.0
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b9",
+    "-e9",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/9",
+   "series": "zstd:long27",
+   "level": 9,
+   "level_label": "-9",
+   "status": "ok",
+   "error": null,
+   "bytes": 671143,
+   "c_speed": 73.44,
+   "d_speed": 1509.4,
+   "c_samples": [
+    73.44
+   ],
+   "d_samples": [
+    1509.4
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b9",
+    "-e9",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/12",
+   "series": "zli:parquet",
+   "level": 12,
+   "level_label": "-l 12",
+   "status": "ok",
+   "error": null,
+   "bytes": 555977,
+   "c_speed": 61.01,
+   "d_speed": 1132.12,
+   "c_samples": [
+    61.01
+   ],
+   "d_samples": [
+    1132.12
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "12",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/12",
+   "series": "zli:serial",
+   "level": 12,
+   "level_label": "-l 12",
+   "status": "ok",
+   "error": null,
+   "bytes": 660386,
+   "c_speed": 35.49,
+   "d_speed": 1187.35,
+   "c_samples": [
+    35.49
+   ],
+   "d_samples": [
+    1187.35
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "12",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/12",
+   "series": "zstd",
+   "level": 12,
+   "level_label": "-12",
+   "status": "ok",
+   "error": null,
+   "bytes": 660358,
+   "c_speed": 35.84,
+   "d_speed": 1571.4,
+   "c_samples": [
+    35.84
+   ],
+   "d_samples": [
+    1571.4
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b12",
+    "-e12",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/12",
+   "series": "zstd:long27",
+   "level": 12,
+   "level_label": "-12",
+   "status": "ok",
+   "error": null,
+   "bytes": 663229,
+   "c_speed": 35.58,
+   "d_speed": 1584.3,
+   "c_samples": [
+    35.58
+   ],
+   "d_samples": [
+    1584.3
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b12",
+    "-e12",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/15",
+   "series": "zli:parquet",
+   "level": 15,
+   "level_label": "-l 15",
+   "status": "ok",
+   "error": null,
+   "bytes": 552914,
+   "c_speed": 43.58,
+   "d_speed": 1126.43,
+   "c_samples": [
+    43.58
+   ],
+   "d_samples": [
+    1126.43
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "15",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/15",
+   "series": "zli:serial",
+   "level": 15,
+   "level_label": "-l 15",
+   "status": "ok",
+   "error": null,
+   "bytes": 654707,
+   "c_speed": 16.53,
+   "d_speed": 1248.34,
+   "c_samples": [
+    16.53
+   ],
+   "d_samples": [
+    1248.34
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "15",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/15",
+   "series": "zstd",
+   "level": 15,
+   "level_label": "-15",
+   "status": "ok",
+   "error": null,
+   "bytes": 654679,
+   "c_speed": 17.09,
+   "d_speed": 1637.8,
+   "c_samples": [
+    17.09
+   ],
+   "d_samples": [
+    1637.8
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b15",
+    "-e15",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/15",
+   "series": "zstd:long27",
+   "level": 15,
+   "level_label": "-15",
+   "status": "ok",
+   "error": null,
+   "bytes": 659052,
+   "c_speed": 17.67,
+   "d_speed": 1606.0,
+   "c_samples": [
+    17.67
+   ],
+   "d_samples": [
+    1606.0
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b15",
+    "-e15",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/19",
+   "series": "zli:parquet",
+   "level": 19,
+   "level_label": "-l 19",
+   "status": "ok",
+   "error": null,
+   "bytes": 546284,
+   "c_speed": 8.36,
+   "d_speed": 1148.05,
+   "c_samples": [
+    8.36
+   ],
+   "d_samples": [
+    1148.05
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "19",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/19",
+   "series": "zli:serial",
+   "level": 19,
+   "level_label": "-l 19",
+   "status": "ok",
+   "error": null,
+   "bytes": 632864,
+   "c_speed": 5.63,
+   "d_speed": 1070.7,
+   "c_samples": [
+    5.63
+   ],
+   "d_samples": [
+    1070.7
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "19",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/19",
+   "series": "zstd",
+   "level": 19,
+   "level_label": "-19",
+   "status": "ok",
+   "error": null,
+   "bytes": 632836,
+   "c_speed": 5.84,
+   "d_speed": 1409.4,
+   "c_samples": [
+    5.84
+   ],
+   "d_samples": [
+    1409.4
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "-b19",
+    "-e19",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/19",
+   "series": "zstd:long27",
+   "level": 19,
+   "level_label": "-19",
+   "status": "ok",
+   "error": null,
+   "bytes": 632945,
+   "c_speed": 5.4,
+   "d_speed": 1405.7,
+   "c_samples": [
+    5.4
+   ],
+   "d_samples": [
+    1405.7
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "-b19",
+    "-e19",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zli:parquet/22",
+   "series": "zli:parquet",
+   "level": 22,
+   "level_label": "-l 22",
+   "status": "ok",
+   "error": null,
+   "bytes": 546214,
+   "c_speed": 6.55,
+   "d_speed": 1128.29,
+   "c_samples": [
+    6.55
+   ],
+   "d_samples": [
+    1128.29
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "parquet",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "22",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zli:serial/22",
+   "series": "zli:serial",
+   "level": 22,
+   "level_label": "-l 22",
+   "status": "ok",
+   "error": null,
+   "bytes": 632936,
+   "c_speed": 5.59,
+   "d_speed": 1067.44,
+   "c_samples": [
+    5.59
+   ],
+   "d_samples": [
+    1067.44
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "cachedObjs/a847d4ccf764f93fd4db504e64368ed8/zli",
+    "benchmark",
+    "sensors.parquet",
+    "-p",
+    "serial",
+    "--chunk-size-mb",
+    "1",
+    "-l",
+    "22",
+    "-n",
+    "3",
+    "--output-csv",
+    "<tmp>/zli.csv"
+   ]
+  },
+  {
+   "id": "zstd/22",
+   "series": "zstd",
+   "level": 22,
+   "level_label": "-22",
+   "status": "ok",
+   "error": null,
+   "bytes": 632908,
+   "c_speed": 5.7,
+   "d_speed": 1350.3,
+   "c_samples": [
+    5.7
+   ],
+   "d_samples": [
+    1350.3
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--ultra",
+    "-b22",
+    "-e22",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  },
+  {
+   "id": "zstd:long27/22",
+   "series": "zstd:long27",
+   "level": 22,
+   "level_label": "-22",
+   "status": "ok",
+   "error": null,
+   "bytes": 632914,
+   "c_speed": 5.27,
+   "d_speed": 1402.3,
+   "c_samples": [
+    5.27
+   ],
+   "d_samples": [
+    1402.3
+   ],
+   "flags": {
+    "c": [],
+    "d": [],
+    "both": []
+   },
+   "command": [
+    "taskset",
+    "-c",
+    "4",
+    "~/miniforge3/bin/zstd",
+    "--single-thread",
+    "-q",
+    "--long=27",
+    "--ultra",
+    "-b22",
+    "-e22",
+    "-i1",
+    "--",
+    "sensors.parquet"
+   ]
+  }
+ ],
+ "trace_link": {
+  "state": "linked",
+  "series": "zli:parquet",
+  "point": "zli:parquet/6",
+  "frame_bytes": 562193,
+  "stream_bytes": 560780,
+  "given_input_bytes": null,
+  "given_stream_bytes": null,
+  "verified": true
+ },
+ "notes": []
+}

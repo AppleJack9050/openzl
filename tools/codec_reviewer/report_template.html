@@ -27,6 +27,10 @@
     --f-zstd: #eda100;
     --f-bitpack: #e87ba4;
     --f-plumbing: #8b95a3;
+    --s-1: #2a78d6;
+    --s-2: #eb6834;
+    --s-3: #1baf7a;
+    --s-base: #60427f;
     --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
   }
@@ -51,6 +55,10 @@
       --f-zstd: #c98500;
       --f-bitpack: #d55181;
       --f-plumbing: #6f7987;
+      --s-1: #3987e5;
+      --s-2: #d95926;
+      --s-3: #199e70;
+      --s-base: #775998;
     }
   }
   * { box-sizing: border-box; }
@@ -75,6 +83,9 @@
   select, input[type="search"] { font: 400 14px/1.2 var(--sans); color: var(--ink); background: var(--raise); border: 1px solid var(--rule-2); border-radius: 7px; padding: 7px 10px; max-width: 100%; }
   .banner { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 10px 14px; border-radius: 8px; background: var(--crit-wash); font-size: 14px; }
   .banner b { color: var(--crit); }
+  .banner.info { background: var(--wash); }
+  .banner.info b { color: var(--ink); }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   section { display: grid; gap: 14px; }
   .explorer { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
@@ -156,6 +167,114 @@
   .tip .kv span:nth-child(even) { font-family: var(--mono); overflow-wrap: anywhere; }
   .tip .fail { color: var(--crit); margin-top: 6px; overflow-wrap: anywhere; }
 
+  /* Ratio vs speed */
+  #bench, #bench-body { grid-template-columns: minmax(0, 1fr); }
+  #bench-body { display: grid; gap: 14px; }
+  .bench-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 24px; }
+  .bench-head .hint { margin-top: 4px; }
+  #bench .facts span { min-width: 0; overflow-wrap: anywhere; }
+  #bench .facts b { overflow-wrap: anywhere; }
+  .dl { font-size: 14px; color: var(--ink); text-underline-offset: 3px; white-space: nowrap; }
+  .banners { display: grid; gap: 8px; }
+  .banner span { overflow-wrap: anywhere; min-width: 0; }
+  .series-legend { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+  .series-btn { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; font: 500 13px/1.25 var(--sans); color: var(--ink); background: var(--raise); border: 1px solid var(--rule-2); border-radius: 7px; padding: 6px 10px; cursor: pointer; text-align: left; }
+  .series-btn:hover:not(:disabled) { border-color: var(--ink-3); }
+  .series-btn .name { overflow-wrap: anywhere; min-width: 0; }
+  .series-btn .n { font-weight: 400; color: var(--ink-3); white-space: nowrap; }
+  .series-btn[aria-pressed="false"] { background: transparent; color: var(--ink-3); border-style: dashed; }
+  .series-btn[aria-pressed="false"] .glyph { opacity: 0.3; }
+  .series-btn:disabled { cursor: default; background: transparent; color: var(--ink-3); }
+  .series-btn:disabled .n { color: var(--crit); }
+  .glyph { flex: none; display: inline-block; overflow: visible; vertical-align: -2px; }
+  .glyph .g-fill { fill: currentColor; }
+  .glyph .g-hollow { fill: var(--raise); stroke: currentColor; stroke-width: 2; }
+  .glyph .g-ink { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+  .glyph .g-unc { fill: none; stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 2 2; }
+  .glyph .g-front { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .k-s1 { color: var(--s-1); } .k-s2 { color: var(--s-2); } .k-s3 { color: var(--s-3); } .k-base { color: var(--s-base); } .k-ink { color: var(--ink-2); }
+  .panels { display: grid; gap: 20px; min-width: 0; }
+  .panel { margin: 0; display: grid; gap: 6px; min-width: 0; }
+  .panel figcaption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+  .panel figcaption .hint { font-size: 12px; }
+  .plot { min-width: 0; background: var(--raise); border: 1px solid var(--rule); border-radius: 9px; }
+  .plot svg { display: block; width: 100%; height: auto; user-select: none; -webkit-user-select: none; }
+  .plot svg:focus { outline: none; }
+  .plot svg:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; border-radius: 4px; }
+  .plot text { font-family: var(--mono); font-size: 11px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .plot .grid { stroke: var(--rule); stroke-width: 1; shape-rendering: crispEdges; }
+  .plot .note { font-family: var(--sans); }
+  .plot .lpath { fill: none; stroke: currentColor; stroke-width: 1; stroke-opacity: 0.35; stroke-linejoin: round; }
+  .plot .m-on { fill: currentColor; stroke: var(--raise); stroke-width: 4; paint-order: stroke; }
+  .plot .m-halo { fill: var(--raise); stroke: var(--raise); stroke-width: 6; }
+  .plot .m-off { fill: var(--raise); stroke: currentColor; stroke-width: 2; }
+  .plot .unc { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 3 2; }
+  .plot .traced { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+  .plot .hl { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .plot .focus { fill: none; stroke: var(--sel); stroke-width: 2; stroke-dasharray: 4 2; }
+  .plot .lbl { fill: var(--ink-2); stroke: var(--raise); stroke-width: 3; paint-order: stroke; stroke-linejoin: round; }
+  .plot .lbl.strong { fill: var(--ink); font-weight: 600; }
+  .keys { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--ink-2); }
+  .keys span { display: inline-flex; align-items: center; gap: 7px; }
+  .tip .who { display: flex; align-items: center; gap: 7px; color: var(--ink-2); margin-top: 2px; overflow-wrap: anywhere; }
+  .tip .go { color: var(--ink-2); margin-top: 6px; }
+  .data td.series { font-family: var(--sans); }
+  .data th.notes { text-align: left; }
+  .data td.notes { white-space: normal; text-align: left; font-family: var(--sans); color: var(--ink-2); min-width: 22ch; overflow-wrap: anywhere; }
+  .data td.notes.bad { color: var(--crit); }
+  .data td.fail { color: var(--ink-3); }
+  .how { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; margin: 12px 0 0; font-size: 14px; }
+  .how dt { color: var(--ink-3); }
+  .how dd { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; min-width: 0; }
+  .how dd > div + div { margin-top: 2px; }
+  .how code { color: var(--ink); overflow-wrap: anywhere; }
+  .how ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  /* The 3D chart */
+  .panel3d { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 320px); gap: 12px 20px; align-items: start; }
+  @media (max-width: 900px) { .panel3d { grid-template-columns: minmax(0, 1fr); } }
+  .p3-main { display: grid; gap: 8px; min-width: 0; }
+  .view-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; }
+  .views { display: inline-flex; flex-wrap: wrap; gap: 2px; border: 1px solid var(--rule-2); border-radius: 7px; background: var(--raise); padding: 2px; }
+  .views button { font: 500 13px/1 var(--sans); color: var(--ink-2); background: transparent; border: 0; border-radius: 5px; height: 28px; padding: 0 9px; cursor: pointer; }
+  .views button:hover { background: var(--wash); color: var(--ink); }
+  .views button[aria-pressed="true"] { background: var(--ink); color: var(--raise); }
+  .views .short { display: none; }
+  @media (max-width: 640px) { .views .long { display: none; } .views .short { display: inline; } }
+  .angles { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .angle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .angle input { accent-color: var(--ink); width: 110px; }
+  .angle output { font: 500 12px/1 var(--mono); color: var(--ink); min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .plot3d svg { cursor: grab; touch-action: pan-y; }
+  .plot3d svg.turning { cursor: grabbing; }
+  .plot3d .grid { shape-rendering: auto; }
+  /* Values that change with the angle (wall and shadow-line opacity, line width) are set on el.style. */
+  .plot .wall { fill: var(--ink); stroke: none; }
+  .plot .shade { fill: var(--ink); fill-opacity: 0.06; stroke: none; }
+  .plot .shade-line { fill: none; stroke: var(--ink); stroke-linejoin: round; stroke-linecap: round; }
+  .plot .bx { fill: none; stroke: var(--rule-2); stroke-width: 1; }
+  .plot .bx.front { stroke-dasharray: 3 4; }
+  .plot .tick { stroke: var(--rule-2); stroke-width: 1; }
+  .plot .stem { stroke: currentColor; stroke-opacity: 0.28; stroke-width: 1; }
+  .plot .stem.on { stroke: var(--ink-3); stroke-opacity: 1; stroke-width: 1.25; }
+  .plot .foot { fill: currentColor; fill-opacity: 0.55; }
+  .plot .foot.on { fill: var(--ink-2); fill-opacity: 1; }
+  .plot .guide { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
+  .plot .gfoot { fill: var(--ink-2); }
+  .plot .beat { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 3; stroke-linejoin: round; }
+  .plot .best { fill: var(--ink-3); }
+  .plot .ttl { fill: var(--ink-2); stroke: var(--raise); stroke-width: 3; paint-order: stroke; stroke-linejoin: round; }
+  .front3 { display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .front3 .hint { font-size: 12px; }
+  table.f3 { min-width: 0; margin-top: 2px; }
+  table.f3 th, table.f3 td { padding: 5px 6px; font-size: 12.5px; }
+  table.f3 td.series { white-space: normal; overflow-wrap: anywhere; }
+  table.f3 .lv { white-space: nowrap; }
+  table.f3 tr:focus-visible { outline: 2px solid var(--sel); outline-offset: -2px; }
+  @media (max-width: 640px) {
+    .how { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .how dd { margin-bottom: 10px; }
+  }
+
   .serve-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 9px; background: var(--raise); font-size: 14px; color: var(--ink-2); }
   .btn { font: 500 14px/1 var(--sans); color: var(--ground); background: var(--ink); border: 1px solid var(--ink); border-radius: 7px; padding: 8px 13px; cursor: pointer; }
   .btn:hover { opacity: 0.88; }
@@ -193,13 +312,13 @@
 <body>
 <main>
   <div class="serve-bar" id="serve-bar" hidden>
-    <button type="button" class="btn" id="open-trace">Open trace…</button>
+    <button type="button" class="btn" id="open-trace">Open trace or results…</button>
     <input type="file" id="trace-file" multiple hidden>
     <details class="reviews" id="reviews" hidden>
       <summary id="reviews-summary">Reviews</summary>
       <ol id="review-list"></ol>
     </details>
-    <span class="serve-status" id="serve-status" role="status">or drop .cbor or DOT traces anywhere on this page</span>
+    <span class="serve-status" id="serve-status" role="status">or drop traces or .bench.json results anywhere on this page</span>
   </div>
   <header class="top">
     <span class="label" id="kind"></span>
@@ -211,12 +330,57 @@
     <div class="banner" id="fail-banner" role="status" hidden></div>
   </header>
 
+  <section id="bench" aria-labelledby="bench-title" hidden>
+    <p class="hint" id="bench-hint" hidden>No ratio-vs-speed results. Measure them with <code>codec_reviewer.py --serve PORT --bench INPUT -p PROFILE</code>, or open a .bench.json here.</p>
+    <div id="bench-body" hidden>
+      <div class="bench-head">
+        <div>
+          <h2 id="bench-title">Ratio vs speed</h2>
+          <p class="hint">Each mark is one level of one series, run on one core, placed by its compression ratio, compression speed and decompression speed. Filled marks are on the frontier: no other shown point is as small, as fast to compress and as fast to decompress.</p>
+        </div>
+        <a class="dl" id="bench-download" hidden>Download results (JSON)</a>
+      </div>
+      <div class="facts" id="bench-facts"></div>
+      <div class="banners" id="bench-banners"></div>
+      <div class="series-legend" id="bench-legend" role="group" aria-label="Series shown in the chart"></div>
+      <div class="panels" id="bench-panels">
+        <figure class="panel" id="panel-3d">
+          <figcaption><h3>Ratio, compression and decompression speed</h3><span class="hint">3D · MB/s on log scales · drag to turn</span></figcaption>
+          <div class="panel3d">
+            <div class="p3-main">
+              <div class="view-bar">
+                <div class="views" id="views-3d" role="group" aria-label="View of both speeds"></div>
+                <div class="angles">
+                  <label class="angle" title="0° looks from the front (ratio × decompression), 90° from the high-ratio side">Turn <input type="range" id="turn-3d" min="0" max="90" step="1"> <output id="turn-3d-out" for="turn-3d"></output></label>
+                  <label class="angle" title="0° looks level, 90° straight down (ratio × compression)">Tilt <input type="range" id="tilt-3d" min="0" max="90" step="1"> <output id="tilt-3d-out" for="tilt-3d"></output></label>
+                </div>
+              </div>
+              <div class="plot plot3d" id="plot-3d"></div>
+              <p class="hint" id="note-3d"></p>
+            </div>
+            <div class="front3" id="front-3d"></div>
+          </div>
+        </figure>
+      </div>
+      <div class="keys" id="bench-keys"></div>
+      <p class="sr-only" id="bench-live" aria-live="polite"></p>
+      <details id="bench-all">
+        <summary id="bench-all-summary">All results</summary>
+        <div class="table-wrap"><table class="data" id="bench-table"></table></div>
+      </details>
+      <details id="bench-how-box">
+        <summary>How this was measured</summary>
+        <dl class="how" id="bench-how"></dl>
+      </details>
+    </div>
+  </section>
+
   <section class="empty" id="empty" aria-labelledby="empty-title" hidden>
     <h2 id="empty-title">Open a trace to review it</h2>
     <p id="empty-missing" hidden></p>
-    <p>Choose <b>Open trace…</b> or drop a trace file anywhere on this page. Record a trace with:</p>
+    <p>Choose <b>Open trace or results…</b> or drop a file anywhere on this page. Record a trace with:</p>
     <pre>zli compress FILE -p PROFILE -o FILE.zl --trace FILE.cbor</pre>
-    <p class="hint">The CBOR file and the DOT text zli prints both work, gzipped or not. Traces are reviewed by the codec_reviewer.py process serving this page.</p>
+    <p class="hint">The CBOR file and the DOT text zli prints both work, gzipped or not. A .bench.json file from <code>codec_reviewer.py --bench-json</code> opens as a page of ratio-vs-speed results. Files are read by the codec_reviewer.py process serving this page.</p>
   </section>
 
   <section id="explorer" aria-labelledby="explore-title">
@@ -263,14 +427,15 @@
   <footer id="footer">
     <p id="coverage"></p>
     <p id="note" hidden></p>
-    <p>Generated by <code>tools/codec_reviewer</code>. A stream's compressed size includes everything downstream of it, and a merge's cost is split evenly across its inputs, as the trace records them.</p>
+    <p>Generated by <code>tools/codec_reviewer</code>.<span id="about-streams"> A stream's compressed size includes everything downstream of it, and a merge's cost is split evenly across its inputs, as the trace records them.</span></p>
   </footer>
 </main>
 <div class="tip" id="tip" hidden></div>
-<div class="drop" id="drop" hidden><div>Drop to review this trace<small>.cbor or DOT text, gzipped or not</small></div></div>
+<div class="drop" id="drop" hidden><div>Drop to open this file<small>a trace (.cbor or DOT text, gzipped or not) or ratio-vs-speed results (.bench.json)</small></div></div>
 
 <script>
 const DATA = __DATA__;
+const BENCH = __BENCH__;
 
 const fmt = new Intl.NumberFormat("en-US");
 const B = (n) => (n == null ? "—" : fmt.format(Math.round(n)));
@@ -759,6 +924,1129 @@ $("chunk-select").addEventListener("change", (e) => {
   state.sel = DATA.selections.find((x) => x.key === e.target.value) || DATA.selections[0];
   renderAll();
 });
+/* ---------- Ratio vs speed ---------- */
+// BENCH is a normalized benchmark document (pareto.py). Its frontiers are computed
+// in Python for every subset of series; the page only looks them up.
+const fixed = (d) => new Intl.NumberFormat("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt1 = fixed(1), fmt2 = fixed(2);
+const speedText = (v) => (v >= 10 ? fmt1.format(v) : v >= 0.1 ? v.toFixed(2) : String(+v.toPrecision(2)));
+const T125 = [];
+for (let e = -3; e <= 8; e++) for (const m of [1, 2, 5]) T125.push(+(m * 10 ** e).toPrecision(3));
+const FLAG_WORDS = {
+  contended: "the core was busy during the best run",
+  short: "the best run took under 0.05 s",
+  quick: "quick: one pass",
+  unpinned: "not pinned to a core",
+  fallback: "zli fell back to generic compression",
+};
+const UNCERTAIN_BOTH = ["quick", "unpinned"];
+
+function shapeEl(kind, x, y, cls, grow = 0) {
+  if (kind === "circle") return s("circle", { class: cls, cx: x, cy: y, r: 5 + grow });
+  if (kind === "square") {
+    const e = 4.5 + grow;
+    return s("rect", { class: cls, x: x - e, y: y - e, width: 2 * e, height: 2 * e, rx: 1.5 });
+  }
+  const e = 6 + grow;
+  return s("path", { class: cls, d: `M${x},${y - e}L${x + e},${y}L${x},${y + e}L${x - e},${y}Z` });
+}
+function glyphSvg(color, draw, size = 14) {
+  const g = s("svg", { class: "glyph " + color, width: size, height: size, viewBox: `${-size / 2} ${-size / 2} ${size} ${size}`, "aria-hidden": "true" });
+  draw(g);
+  return g;
+}
+
+function setupBench() {
+  const doc = BENCH;
+  const section = $("bench");
+  if (!doc) {
+    // A served review can take results later; say how.
+    if (DATA.served && !DATA.empty) {
+      section.hidden = false;
+      $("bench-hint").hidden = false;
+    }
+    return;
+  }
+  section.hidden = false;
+  $("bench-body").hidden = false;
+
+  const series = doc.series;
+  const serById = new Map(series.map((x) => [x.id, x]));
+  const pById = new Map(doc.points.map((p) => [p.id, p]));
+  const ok = doc.points.filter((p) => p.status === "ok");
+  const okOf = new Map(series.map((x) => [x.id, ok.filter((p) => p.series === x.id).sort((a, b) => a.level - b.level)]));
+  const allOf = new Map(series.map((x) => [x.id, doc.points.filter((p) => p.series === x.id).sort((a, b) => a.level - b.level)]));
+  const total = doc.input.bytes;
+  const ratio = (p) => total / p.bytes;
+  const ratioText = (p) => fmt2.format(ratio(p)) + "×";
+  const link = doc.trace_link;
+  const traced = link.state === "linked" && link.point && pById.has(link.point) && pById.get(link.point).status === "ok" ? link.point : null;
+  const color = (x) => (x.tool === "zli" ? "k-s" + ((x.slot % 3) + 1) : "k-base");
+  const shape = (x) => (x.tool === "zli" ? "circle" : x.slot === 0 ? "square" : "diamond");
+  const seriesGlyph = (x, size) => glyphSvg(color(x), (g) => g.append(shapeEl(shape(x), 0, 0, "g-fill")), size);
+  const pointName = (p) => `${serById.get(p.series).label} ${p.level_label}`;
+  const shortLevel = (p) => (p.level < 0 ? "f" + -p.level : String(p.level));
+  const uncertain = (p, axis) => p.flags[axis].length > 0 || p.flags.both.some((f) => UNCERTAIN_BOTH.includes(f));
+  const hidden = new Set();
+  const shownIds = () => series.filter((x) => !hidden.has(x.id)).map((x) => x.id);
+  const subsetKey = (ids) => series.filter((x) => ids.includes(x.id)).map((x) => x.id).join("+");
+  const frontOf = (axis, key) => doc.frontiers[axis].subsets[key] || [];
+  const explorerShown = () => !DATA.empty && !$("explorer").hidden;
+  const goExplorer = () => {
+    if (!explorerShown()) return;
+    $("explorer").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+  };
+
+  /* Facts */
+  const facts = [];
+  const zli = doc.tools.zli, zstd = doc.tools.zstd, m = doc.machine, st = doc.settings;
+  // Points that got fewer runs than asked for (an interrupted or cut-short sweep).
+  const fewer = st.quick ? 0 : ok.filter((p) => p.c_samples.length < (st.rounds || 0)).length;
+  const uses = (tool) => series.some((x) => x.tool === tool);
+  if (!DATA.bench_only) facts.push(h("span", {}, [h("b", { text: doc.input.name || "(unnamed input)" })]));
+  facts.push(h("span", {}, [h("b", { text: B(total) }), " bytes"]));
+  facts.push(m.pin === "none" || m.core == null ? h("span", { text: "unpinned" }) : h("span", {}, ["one core (core ", h("b", { text: String(m.core) }), ")"]));
+  facts.push(st.quick ? h("span", { text: "quick: one pass" }) : st.rounds ? h("span", {}, [fewer ? "best of up to " : "best of ", h("b", { text: B(st.rounds) }), st.rounds === 1 ? " round" : " rounds"]) : null);
+  if (uses("zstd")) facts.push(h("span", {}, ["zstd ", h("b", { text: zstd.version || zstd.path || "?" })]));
+  if (uses("zli")) {
+    let path = zli.path || "zli";
+    if (zli.build_dir && zli.build_dir.length > 8 && path.includes(zli.build_dir)) path = path.replace(zli.build_dir, zli.build_dir.slice(0, 4) + "…");
+    facts.push(h("span", {}, ["zli ", h("b", { text: path }), zli.sha256 ? " sha256 " : null, zli.sha256 ? h("b", { text: zli.sha256.slice(0, 8) }) : null, zli.note ? ` · ${zli.note}` : null]));
+  }
+  $("bench-facts").replaceChildren(...facts.filter(Boolean));
+
+  if (DATA.served && DATA.served.id != null) {
+    const a = $("bench-download");
+    const root = new URL(DATA.served.root, location.href);
+    a.href = new URL(`api/reviews/${DATA.served.id}/benchmark`, root).href;
+    a.setAttribute("download", `${doc.input.name || "results"}.bench.json`);
+    a.hidden = false;
+  }
+
+  /* Trace link, in words */
+  function linkSentence() {
+    const who = link.series && serById.has(link.series) ? serById.get(link.series).label : "the traced series";
+    const not = "The review below is not one of these points: ";
+    if (link.state === "linked" && traced) {
+      const p = pById.get(traced);
+      const check = link.verified === true ? " Its frame decompressed back to the input (SHA-256 checked)." : link.verified === false ? " Its frame did NOT decompress back to the input." : "";
+      return `The review below is the ${p.level_label} run of ${serById.get(p.series).label}.${check}`;
+    }
+    if (link.state === "mismatch") {
+      let t = `${not}the trace does not match what ${who} produces with these settings`;
+      if (link.given_input_bytes != null && link.given_stream_bytes != null && link.stream_bytes != null) {
+        t += ` (${B(link.given_input_bytes)} B in, ${B(link.given_stream_bytes)} B in streams; the benchmark's trace has ${B(total)} B in, ${B(link.stream_bytes)} B in streams)`;
+      }
+      return t + ".";
+    }
+    if (link.state === "frame_mismatch") {
+      return `${not}${who}${link.frame_bytes != null ? ` wrote a ${B(link.frame_bytes)} B frame when traced, which` : ""} does not match its -l 6 result (the profile picks its own level).`;
+    }
+    if (link.state === "no_point") return `The review below cannot be matched to a point: ${who} has no successful -l 6 result.`;
+    return DATA.bench_only ? "These results are shown without a trace." : "These results carry no link to the trace reviewed below, so no point is marked as the traced run.";
+  }
+
+  /* Banners */
+  const banners = [];
+  const banner = (critical, head, ...rest) => banners.push(h("div", { class: "banner" + (critical ? "" : " info"), role: "status" }, [h("b", { text: head }), ...rest.filter(Boolean).map((t) => h("span", { text: t }))]));
+  const counts = (status) => doc.points.filter((p) => p.status === status).length;
+  const skipped = counts("skipped"), failed = counts("failed"), timeouts = counts("timeout");
+  if (!doc.points.length) banner(true, "⚠ The results have no points", "Nothing was measured.");
+  else if (!ok.length) banner(true, "⚠ No point was measured successfully", "Nothing can be drawn; All results below lists each error.");
+  if (doc.stopped === "interrupted" || !doc.complete) {
+    const lost = [
+      skipped ? `${B(skipped)} of ${plural(doc.points.length, "point")} ${skipped === 1 ? "was" : "were"} not measured` : null,
+      fewer ? `${plural(fewer, "point")} ${fewer === 1 ? "has" : "have"} fewer than ${plural(st.rounds, "run")}` : null,
+    ].filter(Boolean).join("; ");
+    banner(true, `⚠ ${doc.stopped === "interrupted" ? "Interrupted" : "Incomplete"}${lost ? ": " + lost : ""}`,
+      "The frontier covers only the points that were measured, each with the runs it got.");
+  }
+  if ((failed || timeouts) && ok.length) {
+    const what = [failed ? plural(failed, "point") + " failed" : null, timeouts ? plural(timeouts, "point") + " timed out" : null].filter(Boolean).join(" and ");
+    banner(false, `${what}`, "They are not drawn; All results lists the errors.");
+  }
+  const busy = ok.filter((p) => p.flags.c.includes("contended") || p.flags.d.includes("contended")).length;
+  if (busy) banner(false, `${plural(busy, "point")} ran while the core was busy`, "Other work on the core can only slow a run down, so those speeds may be low. They have a dashed ring and a ~ in the table.");
+  const short = ok.filter((p) => p.flags.c.includes("short") || p.flags.d.includes("short")).length;
+  if (short) banner(false, `${plural(short, "point")} timed less than 0.05 s per run`, "Timer resolution makes those speeds rough. They have a dashed ring and a ~ in the table.");
+  if (m.pin === "none" || ok.some((p) => p.flags.both.includes("unpinned"))) banner(false, "The runs were not pinned to one core", "Speeds are less repeatable.");
+  const fell = series.map((x) => [x, okOf.get(x.id).filter((p) => p.flags.both.includes("fallback"))]).filter(([, ps]) => ps.length);
+  if (fell.length) {
+    banner(true, `⚠ OpenZL fell back to generic compression for ${fell.map(([x, ps]) => `${x.label} ${ps.map((p) => p.level_label).join(", ")}`).join("; ")}`,
+      `zli printed "Encountered warnings during operation", so those points do not show the profile's own compression.`);
+  }
+  if (traced && link.verified === false) banner(true, "⚠ The traced frame did not decompress back to the input", "The traced run is marked, but its output was wrong.");
+  if (!traced && !DATA.bench_only) banner(false, "No point is marked as the traced run", linkSentence(), ...doc.notes);
+  $("bench-banners").replaceChildren(...banners);
+
+  /* Legend */
+  const legendBtns = new Map();
+  function renderLegend() {
+    const enabled = series.filter((x) => okOf.get(x.id).length);
+    const visible = enabled.filter((x) => !hidden.has(x.id));
+    for (const x of series) {
+      const btn = legendBtns.get(x.id);
+      const n = okOf.get(x.id).length, all = allOf.get(x.id).length;
+      btn.setAttribute("aria-pressed", String(!hidden.has(x.id)));
+      if (!n) {
+        btn.disabled = true;
+        const first = allOf.get(x.id)[0];
+        btn.title = first ? `No level of this series was measured: ${first.status}${first.error ? ": " + first.error : ""}` : "This series has no points.";
+      } else if (visible.length === 1 && !hidden.has(x.id)) {
+        btn.title = "The last shown series stays shown.";
+      } else {
+        btn.title = hidden.has(x.id) ? "Show this series" : "Hide this series; the frontier is redrawn without it";
+      }
+      btn.querySelector(".n").textContent = !n ? "no results" : n === all ? plural(n, "level") : `${B(n)} of ${plural(all, "level")}`;
+    }
+  }
+  for (const x of series) {
+    const btn = h("button", { type: "button", class: "series-btn" }, [seriesGlyph(x), h("span", { class: "name", text: x.label }), h("span", { class: "n" })]);
+    btn.addEventListener("click", () => {
+      if (!hidden.has(x.id)) {
+        const others = series.filter((y) => y.id !== x.id && !hidden.has(y.id) && okOf.get(y.id).length);
+        if (!others.length) return;
+        hidden.add(x.id);
+      } else hidden.delete(x.id);
+      renderLegend();
+      drawAll();
+    });
+    legendBtns.set(x.id, btn);
+  }
+  $("bench-legend").replaceChildren(...legendBtns.values());
+  renderLegend();
+
+  /* Keys */
+  const keys = [
+    h("span", {}, [glyphSvg("k-ink", (g) => g.append(s("circle", { class: "g-fill", r: 5 }))), "on the frontier"]),
+    h("span", {}, [glyphSvg("k-ink", (g) => g.append(s("circle", { class: "g-hollow", r: 4.5 }))), "beaten: another point is as small and as fast at both speeds"]),
+    h("span", {}, [glyphSvg("k-ink", (g) => g.append(s("path", { class: "g-front", d: "M-7,-5H-1V3H7" })), 16), "frontier on two axes, shaded on their wall"]),
+    ok.some((p) => uncertain(p, "c") || uncertain(p, "d")) ? h("span", {}, [glyphSvg("k-ink", (g) => g.append(s("circle", { class: "g-unc", r: 6 }))), "speed uncertain"]) : null,
+    traced ? h("span", {}, [glyphSvg("k-ink", (g) => g.append(s("circle", { class: "g-ink", r: 6 }))), explorerShown() ? "traced run, reviewed below" : "traced run"]) : null,
+  ];
+  $("bench-keys").replaceChildren(...keys.filter(Boolean));
+
+  /* Axes: stable when series are hidden. */
+  const ratios = ok.map(ratio);
+  const X = (() => {
+    if (!ratios.length) return { lo: 0, hi: 1 };
+    const lo = Math.min(...ratios), hi = Math.max(...ratios), span = hi - lo;
+    // Nearly equal ratios keep a readable axis instead of stretching a few bytes
+    // across the whole width.
+    const pad = span > 0 && span >= hi * 0.01 ? span * 0.04 : Math.max(0.1, hi * 0.05);
+    return { lo: Math.max(0, lo - pad), hi: hi + pad };
+  })();
+  function yDomain(axis) {
+    const v = ok.map((p) => p[axis + "_speed"]);
+    if (!v.length) return { a: 1, b: 10 };
+    let a = Math.min(...v) / 1.25, b = Math.max(...v) * 1.25;
+    if (T125.filter((t) => t >= a && t <= b).length < 2) {
+      a = Math.min(a, [...T125].reverse().find((t) => t <= a) ?? a);
+      b = Math.max(b, T125.find((t) => t >= b) ?? b);
+    }
+    return { a, b };
+  }
+  const Y = { c: yDomain("c"), d: yDomain("d") };
+  function xTicks(count) {
+    const span = X.hi - X.lo;
+    let step = null;
+    outer: for (let e = -3; e <= 6; e++) for (const k of [1, 2, 2.5, 5]) {
+      const cand = k * 10 ** e;
+      if (span / cand <= count) { step = cand; break outer; }
+    }
+    step = step || span;
+    // "4.0×", "4.25×"; whole numbers once the step is 10 or more.
+    const dec = step >= 10 ? 0 : Math.min(3, Math.max(1, (String(+step.toPrecision(6)).split(".")[1] || "").length));
+    const f = fixed(dec);
+    const out = [];
+    for (let i = Math.ceil(X.lo / step - 1e-9); i * step <= X.hi + 1e-9; i++) {
+      const v = i * step + 0; // + 0 turns -0 into 0
+      out.push({ v, t: f.format(v) + "×" });
+    }
+    return out;
+  }
+  function yTicks(axis, maxCount) {
+    const { a, b } = Y[axis];
+    let t = T125.filter((v) => v >= a && v <= b);
+    if (t.length > maxCount) t = t.filter((v) => Math.abs(Math.log10(v) - Math.round(Math.log10(v))) < 1e-9);
+    while (t.length > maxCount) t = t.filter((_, i) => i % 2 === 0);
+    return t.map((v) => ({ v, t: v >= 1 ? B(v) : String(v) }));
+  }
+
+  /* Panels */
+  const panels = {};
+  const focusId = { cd: null };
+  const has3 = !!doc.frontiers.cd;
+  let hoverId = null;
+  const markBox = (d, pad) => ({ x1: d.x - pad, y1: d.y - pad, x2: d.x + pad, y2: d.y + pad });
+  const hits = (b, list) => list.some((o) => b.x1 < o.x2 && b.x2 > o.x1 && b.y1 < o.y2 && b.y2 > o.y1);
+  // Direct labels: place(d, text, cls, gap) puts text beside a drawn mark, clear of
+  // the other marks, the boxes taken so far and the traced ring, and inside(box).
+  function makePlacer({ drawn, tracedD, boxes, inside, layer }) {
+    const ringBox = tracedD ? [markBox(tracedD, 13)] : [];
+    return (d, text, cls, gap) => {
+      const w = text.length * 6.7, hgt = 11;
+      const spots = d === tracedD
+        // Level with the traced mark, so it cannot read as another mark's label.
+        ? [[gap + 1, 4], [-gap - 1 - w, 4], [gap, -gap + 1], [-w / 2, -gap - 3], [-gap - w, -gap + 1], [-w / 2, gap + hgt]]
+        : [[gap, -gap + 1], [gap + 1, 4], [-w / 2, -gap - 3], [-gap - w, -gap + 1], [-gap - 1 - w, 4], [-w / 2, gap + hgt]];
+      const others = drawn.filter((o) => o !== d);
+      const ring = d === tracedD ? [] : ringBox;
+      const strict = [...others.map((o) => markBox(o, 6)), ...boxes, ...ring];
+      const loose = [...others.filter((o) => o.on || o.p.id === traced).map((o) => markBox(o, 6)), ...boxes, ...ring];
+      for (const avoid of [strict, loose]) {
+        for (const [dx, dy] of spots) {
+          const bx = { x1: d.x + dx - 1, y1: d.y + dy - hgt + 2, x2: d.x + dx + w + 1, y2: d.y + dy + 3 };
+          if (!inside(bx) || hits(bx, avoid)) continue;
+          boxes.push(bx);
+          layer.append(s("text", { class: "lbl" + (cls ? " " + cls : ""), x: (d.x + dx).toFixed(1), y: (d.y + dy).toFixed(1) }, text));
+          return true;
+        }
+      }
+      return false;
+    };
+  }
+  const commandText = (p) => p.command.map((a) => (/[\s"'\\$]/.test(a) || a === "" ? JSON.stringify(a) : a)).join(" ");
+  const goLine = () => h("div", { class: "go", text: explorerShown() ? "Traced: the review below is this run. Click or press Enter to go there." : "Traced: the trace was recorded from this run." });
+  function ring(axis, p, cls) {
+    const panel = panels[axis];
+    if (!panel) return;
+    const d = panel.drawn.find((q) => q.p === p);
+    if (d) panel.gHl.append(s("circle", { class: cls, cx: d.x, cy: d.y, r: cls === "focus" ? 16 : 8.5 }));
+  }
+  function clearRings() {
+    if (panels.cd) panels.cd.gHl.replaceChildren();
+  }
+  function showPoint(p, anchor) {
+    clearRings();
+    ring("cd", p, "hl");
+    if (focusId.cd && document.activeElement === svg3) ring("cd", pById.get(focusId.cd), "focus");
+    if (!moving()) decorate3(p);
+    showTip(anchor, tipNodes3(p));
+    $("bench-live").textContent = sentence3(p);
+  }
+  function anchorAt(panel, d) {
+    const r = panel.svg.getBoundingClientRect();
+    const k = r.width / panel.W;
+    return { currentTarget: panel.svg, clientX: r.left + d.x * k, clientY: r.top + d.y * k };
+  }
+  // Arrow keys, Home and End: left and right go by panel.byRatio, up and down by
+  // panel.bySpeed. True when the key was one of them.
+  function moveFocus(e, panel, current, focusOn) {
+    const order = e.key === "ArrowUp" || e.key === "ArrowDown" ? panel.bySpeed : panel.byRatio;
+    let i = order.findIndex((q) => q.p.id === current);
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") i = i < 0 ? 0 : Math.min(order.length - 1, i + 1);
+    else if (e.key === "ArrowLeft" || e.key === "ArrowDown") i = i < 0 ? order.length - 1 : Math.max(0, i - 1);
+    else if (e.key === "Home") i = 0;
+    else if (e.key === "End") i = order.length - 1;
+    else return false;
+    e.preventDefault();
+    focusOn(order[i].p.id);
+    return true;
+  }
+
+  /* The chart: ratio, compression and decompression speed in one box you can turn */
+  // In the box, x is the ratio, y the compression speed (into the page) and z the
+  // decompression speed (up), each from -1 to 1 over the domains above. The camera
+  // turns about z and tilts up; it stays on the (+ratio, -compression, +decompression)
+  // side, so no view is mirrored and the walls behind the points are always the
+  // floor (z = -1), the back wall (y = 1) and the side wall (x = -1).
+  const VIEWS = [
+    { key: "turned", name: "3D", short: "3D", turn: 35, tilt: 30, title: "Turned view of all three (1)" },
+    { key: "top", name: "Ratio × compression", short: "Ratio × comp.", turn: 0, tilt: 90, title: "Seen from above: ratio against compression speed (2)",
+      phrase: "seen from above (ratio × compression)", say: "View: ratio × compression, seen from above; decompression speed is hidden." },
+    { key: "front", name: "Ratio × decompression", short: "Ratio × decomp.", turn: 0, tilt: 0, title: "Seen from the front: ratio against decompression speed (3)",
+      phrase: "seen from the front (ratio × decompression)", say: "View: ratio × decompression, seen from the front; compression speed is hidden." },
+    { key: "side", name: "Compression × decompression", short: "Comp. × decomp.", turn: 90, tilt: 0, title: "Seen from the high-ratio side, ratio hidden (4)",
+      phrase: "seen from the high-ratio side (compression × decompression)", say: "View: compression × decompression, seen from the high-ratio side; ratio is hidden." },
+  ];
+  const FLATS = VIEWS.slice(1);
+  const HALF = [2, 1, 0.75];
+  const CORNERS = [];
+  for (const a of [-1, 1]) for (const b of [-1, 1]) for (const c of [-1, 1]) CORNERS.push([a, b, c]);
+  const cam = { turn: 35, tilt: 30 };
+  let svg3 = null, viewBtns = [], frame = 0, anim = null, dragging = false, sliderHeld = false, grab = null;
+  let showAllFront = false, lastFrontKey = null;
+  const moving = () => dragging || sliderHeld || anim != null;
+  const clampAngle = (v) => Math.min(90, Math.max(0, v));
+  const atView = (v) => Math.abs(cam.turn - v.turn) < 0.01 && Math.abs(cam.tilt - v.tilt) < 0.01;
+  const viewSay = (v) => v.say || `View: 3D, turned ${v.turn}°, tilted ${v.tilt}°.`;
+  const stepSay = () => {
+    const v = VIEWS.find(atView);
+    return v ? viewSay(v) : `Turned ${Math.round(cam.turn)}°, tilted ${Math.round(cam.tilt)}°.`;
+  };
+  const say = (text) => { $("bench-live").textContent = text; };
+  const byPointId = (a, b) => (a.p.id < b.p.id ? -1 : a.p.id > b.p.id ? 1 : 0);
+  const nx = (r) => (2 * (r - X.lo)) / (X.hi - X.lo) - 1;
+  const nl = (axis, v) => {
+    const a = Math.log10(Y[axis].a), b = Math.log10(Y[axis].b);
+    return (2 * (Math.log10(v) - a)) / (b - a) - 1;
+  };
+  const norm = (p) => [nx(ratio(p)), nl("c", p.c_speed), nl("d", p.d_speed)];
+  // Screen right, screen up and toward the viewer, in box coordinates.
+  function basis(turn, tilt) {
+    const f = (turn * Math.PI) / 180, e = (tilt * Math.PI) / 180;
+    return [
+      [Math.cos(f), Math.sin(f), 0],
+      [-Math.sin(e) * Math.sin(f), Math.sin(e) * Math.cos(f), Math.cos(e)],
+      [Math.cos(e) * Math.sin(f), -Math.cos(e) * Math.cos(f), Math.sin(e)],
+    ].map((row) => row.map((c) => (Math.abs(c) < 1e-12 ? 0 : c)));
+  }
+  const project = (bas, n) => bas.map((row) => row[0] * n[0] * HALF[0] + row[1] * n[1] * HALF[1] + row[2] * n[2] * HALF[2]);
+  function screenBox(bas) {
+    const box = { minx: Infinity, maxx: -Infinity, miny: Infinity, maxy: -Infinity };
+    for (const n of CORNERS) {
+      const [sx, sy] = project(bas, n);
+      box.minx = Math.min(box.minx, sx);
+      box.maxx = Math.max(box.maxx, sx);
+      box.miny = Math.min(box.miny, sy);
+      box.maxy = Math.max(box.maxy, sy);
+    }
+    box.bw = box.maxx - box.minx;
+    box.bh = box.maxy - box.miny;
+    return box;
+  }
+  const TURNED_BOX = screenBox(basis(VIEWS[0].turn, VIEWS[0].tilt));
+  // The maximal pairs (a right, b up) as a staircase from the left edge at the
+  // highest b down to the bottom edge after the largest a, as a 2D chart draws one.
+  function outline(pairs) {
+    const keep = [];
+    let best = -Infinity;
+    for (const q of [...pairs].sort((p, q) => q[0] - p[0] || q[1] - p[1])) {
+      if (q[1] > best) { keep.push(q); best = q[1]; }
+    }
+    keep.reverse();
+    if (!keep.length) return [];
+    const out = [[-1, keep[0][1]], keep[0]];
+    for (let i = 1; i < keep.length; i++) out.push([keep[i - 1][0], keep[i][1]], keep[i]);
+    out.push([keep[keep.length - 1][0], -1]);
+    return out;
+  }
+  const f1 = (v) => v.toFixed(1);
+  const pathOf = (pts, close) => pts.map((q, i) => `${i ? "L" : "M"}${f1(q.x)},${f1(q.y)}`).join("") + (close ? "Z" : "");
+  const seg = (a, b, cls) => s("line", { class: cls, x1: f1(a.x), y1: f1(a.y), x2: f1(b.x), y2: f1(b.y) });
+  const requestCube = () => {
+    if (!frame) frame = requestAnimationFrame(() => { frame = 0; drawCube(); });
+  };
+
+  function drawCube() {
+    if (!svg3) return;
+    const W = Math.max(240, Math.floor($("plot-3d").clientWidth));
+    const narrow = W < 640;
+    const H = narrow ? 320 : 420;
+    const flat = FLATS.find(atView) || null;
+    // t is 1 at a flat view and 0 from 10° away: near a flat view the box stretches
+    // to fill the plot like a 2D chart; further out it keeps its shape.
+    const near = Math.min(...FLATS.map((v) => Math.max(Math.abs(cam.turn - v.turn), Math.abs(cam.tilt - v.tilt))));
+    const t = Math.max(0, 1 - near / 10);
+    const M0 = { l: narrow ? 50 : 64, r: narrow ? 50 : 64, t: 26, b: narrow ? 40 : 46 };
+    const M1 = { l: narrow ? 44 : 54, r: 14, t: 20, b: 44 };
+    const M = {};
+    for (const side of ["l", "r", "t", "b"]) M[side] = M0[side] + (M1[side] - M0[side]) * t;
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const bas = basis(cam.turn, cam.tilt);
+    const box = screenBox(bas);
+    const k0 = Math.min((W - M0.l - M0.r) / TURNED_BOX.bw, (H - M0.t - M0.b) / TURNED_BOX.bh);
+    const k = Math.min(k0, pw / box.bw, ph / box.bh);
+    const kx = k + (pw / box.bw - k) * t, ky = k + (ph / box.bh - k) * t;
+    const cx = M.l + pw / 2 - (kx * (box.minx + box.maxx)) / 2;
+    const cy = M.t + ph / 2 + (ky * (box.miny + box.maxy)) / 2;
+    const S = (n) => {
+      const [sx, sy, depth] = project(bas, n);
+      return { x: cx + kx * sx, y: cy - ky * sy, depth };
+    };
+    const key = subsetKey(shownIds());
+    const front = frontOf("cd", key);
+    const onFront = new Set(front);
+
+    svg3.setAttribute("width", W);
+    svg3.setAttribute("height", H);
+    svg3.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const [gWalls, gGrid, gShade, gAxes, gStems, gPaths, gMarks, gRings, gLabels, gHl] = Array.from({ length: 10 }, () => s("g"));
+    svg3.replaceChildren(gWalls, gGrid, gShade, gAxes, gStems, gPaths, gMarks, gRings, gLabels, gHl);
+    const text = (x, y, anchor, str, cls) => gAxes.append(s("text", { ...(cls ? { class: cls } : {}), x: f1(x), y: f1(y), "text-anchor": anchor }, str));
+    const textBox = (x, y, anchor, str) => {
+      const w = str.length * 6.7;
+      const x1 = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      return { x1: x1 - 2, y1: y - 10, x2: x1 + w + 2, y2: y + 3 };
+    };
+    // Axis-aligned lines of a flat view sit on the pixel grid.
+    const gridLine = (a, b) => {
+      if (!flat) return seg(a, b, "grid");
+      const snap = (u, v) => (Math.abs(u - v) < 0.01 ? [Math.round(u) + 0.5, Math.round(u) + 0.5] : [u, v]);
+      const [x1, x2] = snap(a.x, b.x), [y1, y2] = snap(a.y, b.y);
+      return seg({ x: x1, y: y1 }, { x: x2, y: y2 }, "grid");
+    };
+
+    const drawn = [];
+    for (const x of series) {
+      if (hidden.has(x.id)) continue;
+      for (const p of okOf.get(x.id)) {
+        const n = norm(p);
+        const at = S(n);
+        drawn.push({ p, ser: x, n, x: at.x, y: at.y, depth: at.depth, on: onFront.has(p.id), foot: S([n[0], n[1], -1]) });
+      }
+    }
+    const drawnById = new Map(drawn.map((d) => [d.p.id, d]));
+    const tracedD = drawnById.get(traced);
+    const uncShown = (p) => (flat && flat.key === "top" ? uncertain(p, "c") : flat && flat.key === "front" ? uncertain(p, "d") : uncertain(p, "c") || uncertain(p, "d"));
+
+    // Tick values: a flat view counts them like a 2D chart, a turned view by the
+    // length of each axis on screen.
+    const ticks = {};
+    const axes = {};
+    const nOf = (a, v) => (a === "x" ? nx(v) : nl(a, v));
+    const hTicks = (len) => xTicks(Math.max(2, Math.min(narrow ? 5 : 10, Math.floor(len / (narrow ? 64 : 80)))));
+    if (flat) {
+      if (flat.key === "side") ticks.c = yTicks("c", Math.max(2, Math.floor(pw / 56)));
+      else ticks.x = hTicks(pw);
+      const vert = flat.key === "top" ? "c" : "d";
+      ticks[vert] = yTicks(vert, Math.max(3, Math.floor(ph / 26)));
+    } else {
+      const edge = (A, Bn, at) => {
+        const a = S(A), b = S(Bn), len = Math.hypot(b.x - a.x, b.y - a.y);
+        return { at, a, b, len, dir: len ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : { x: 0, y: 0 } };
+      };
+      axes.d = edge([-1, -1, -1], [-1, -1, 1], (n) => [-1, -1, n]);
+      // Compression runs along the front edge while decompression shows, else along the left.
+      const xc = axes.d.len >= 36 ? 1 : -1;
+      axes.c = edge([xc, -1, -1], [xc, 1, -1], (n) => [xc, n, -1]);
+      axes.x = edge([-1, -1, -1], [1, -1, -1], (n) => [n, -1, -1]);
+      ticks.x = hTicks(axes.x.len);
+      for (const a of ["c", "d"]) ticks[a] = yTicks(a, Math.max(2, Math.floor(axes[a].len / (26 + 30 * Math.abs(axes[a].dir.x)))));
+    }
+
+    // Walls behind the points that face the viewer, with their grids and shadows:
+    // each wall is shaded with what the frontier of its two axes beats.
+    const w = bas[2];
+    const walls = [
+      { face: w[2], corners: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1]], axes: ["x", "c"], shadow: "c",
+        pair: (n) => [n[0], n[1]], lift: ([a, b]) => [a, b, -1] },
+      { face: -w[1], corners: [[-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]], axes: ["x", "d"], shadow: "d",
+        pair: (n) => [n[0], n[2]], lift: ([a, b]) => [a, 1, b] },
+      { face: w[0], corners: [[-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [-1, -1, 1]], axes: ["c", "d"], shadow: "cd",
+        pair: (n) => [n[1], n[2]], lift: ([a, b]) => [-1, a, b] },
+    ].filter((wl) => wl.face > 0.02);
+    for (const wl of walls) {
+      const el = s("path", { class: "wall", d: pathOf(wl.corners.map(S), true) });
+      el.style.fillOpacity = (0.035 * (1 - t)).toFixed(4);
+      gWalls.append(el);
+      wl.axes.forEach((a, i) => {
+        for (const tk of ticks[a] || []) {
+          const n = nOf(a, tk.v);
+          gGrid.append(gridLine(S(wl.lift(i ? [-1, n] : [n, -1])), S(wl.lift(i ? [1, n] : [n, 1]))));
+        }
+      });
+      const o = outline(frontOf(wl.shadow, key).filter((id) => drawnById.has(id)).map((id) => wl.pair(drawnById.get(id).n)));
+      if (!o.length) continue;
+      const pts = o.map((q) => S(wl.lift(q)));
+      gShade.append(s("path", { class: "shade", d: pathOf([...pts, S(wl.lift([-1, -1]))], true) }));
+      const facing = wl.face ** 8;
+      const stair = s("path", { class: "shade-line", d: pathOf(pts) });
+      stair.style.strokeWidth = (1.25 + 0.75 * facing).toFixed(2);
+      stair.style.strokeOpacity = (0.45 + 0.55 * facing).toFixed(2);
+      gShade.append(stair);
+    }
+
+    // Box edges, ticks and axis titles.
+    const taken = [];
+    if (flat) {
+      const base = { top: [[-1, -1, -1], [1, -1, -1]], front: [[-1, 1, -1], [1, 1, -1]], side: [[-1, -1, -1], [-1, 1, -1]] }[flat.key];
+      gAxes.append(gridLine(S(base[0]), S(base[1])));
+      const horiz = flat.key === "side" ? "c" : "x";
+      const vert = flat.key === "top" ? "c" : "d";
+      for (const tk of ticks[horiz]) {
+        const n = nOf(horiz, tk.v);
+        text(Math.round(S(horiz === "x" ? [n, -1, -1] : [-1, n, -1]).x) + 0.5, M.t + ph + 16, "middle", tk.t);
+      }
+      for (const tk of ticks[vert]) {
+        const n = nOf(vert, tk.v);
+        text(M.l - 8, Math.round(S(vert === "c" ? [-1, n, -1] : [-1, 1, n]).y) + 0.5 + 4, "end", tk.t);
+      }
+      text(4, M.t - 8, "start", flat.key === "top" ? "compression MB/s" : "decompression MB/s");
+      text(M.l + pw, M.t - 8, "end", "better ↗", "note");
+      text(M.l + pw, H - 6, "end", flat.key === "side" ? "compression speed (MB/s) →" : narrow ? "ratio (input ÷ output) →" : "compression ratio (input bytes ÷ compressed bytes) →", "note");
+    } else {
+      for (const n of CORNERS) {
+        for (let i = 0; i < 3; i++) {
+          if (n[i] !== -1) continue;
+          const m = n.slice();
+          m[i] = 1;
+          const back = (i !== 0 && n[0] === -1) || (i !== 1 && n[1] === 1) || (i !== 2 && n[2] === -1);
+          gAxes.append(seg(S(n), S(m), back ? "bx" : "bx front"));
+        }
+      }
+      const center = S([0, 0, 0]);
+      const kept = { x: [], c: [], d: [] };
+      for (const a of ["x", "c", "d"]) {
+        const ax = axes[a];
+        if (ax.len < 36) continue;
+        ax.mid = S(ax.at(0));
+        let o = { x: -ax.dir.y, y: ax.dir.x };
+        if (o.x * (ax.mid.x - center.x) + o.y * (ax.mid.y - center.y) < 0) o = { x: -o.x, y: -o.y };
+        const anchor = Math.abs(o.x) > 0.45 ? (o.x > 0 ? "start" : "end") : "middle";
+        const shift = anchor === "middle" ? (o.y > 0 ? 8 : -1) : 4;
+        Object.assign(ax, { o, anchor, shift });
+        let last = -Infinity;
+        for (const tk of ticks[a]) {
+          const q = S(ax.at(nOf(a, tk.v)));
+          const along = (q.x - ax.a.x) * ax.dir.x + (q.y - ax.a.y) * ax.dir.y;
+          if (along - last < (anchor === "middle" ? 44 : 22)) continue;
+          last = along;
+          kept[a].push(q);
+          gAxes.append(seg(q, { x: q.x + 4 * o.x, y: q.y + 4 * o.y }, "tick"));
+          const lx = q.x + 8 * o.x, ly = q.y + 8 * o.y + shift;
+          text(lx, ly, anchor, tk.t);
+          taken.push(textBox(lx, ly, anchor, tk.t));
+        }
+      }
+      // Titles keep clear of every mark if they can, else of the frontier marks
+      // and the traced ring only (they have a halo), before they are left out.
+      const ringBox = tracedD ? [markBox(tracedD, 13)] : [];
+      const avoidAll = [...drawn.map((d) => markBox(d, 6)), ...ringBox];
+      const avoidFront = [...drawn.filter((d) => d.on).map((d) => markBox(d, 6)), ...ringBox];
+      const titles = { d: narrow ? "decomp. MB/s" : "decompression MB/s", c: narrow ? "comp. MB/s" : "compression MB/s", x: "ratio" };
+      for (const a of ["d", "c", "x"]) {
+        const ax = axes[a];
+        if (ax.len < 36) continue;
+        const { o, anchor, shift } = ax;
+        const spots = [];
+        if (a !== "x") {
+          spots.push([ax.b.x + 12 * ax.dir.x, ax.b.y + 12 * ax.dir.y + 4, ax.dir.x >= 0 ? "start" : "end"]);
+          spots.push([ax.b.x + 30 * o.x, ax.b.y + 30 * o.y + shift, anchor]);
+        }
+        const kq = kept[a];
+        if (kq.length >= 2) {
+          const i = Math.floor((kq.length - 1) / 2);
+          spots.push([(kq[i].x + kq[i + 1].x) / 2 + 26 * o.x, (kq[i].y + kq[i + 1].y) / 2 + 26 * o.y + shift, anchor]);
+        }
+        spots.push([ax.mid.x + 44 * o.x, ax.mid.y + 44 * o.y + shift, anchor]);
+        // Centred past the end of the axis: on a phone the side margins are too narrow.
+        if (a !== "x") spots.push([ax.b.x + 14 * ax.dir.x, ax.b.y + 14 * ax.dir.y + (ax.dir.y < 0 ? 0 : 10), "middle"]);
+        // Top left, where a flat view names its vertical axis, for an axis that ends there.
+        if (a !== "x" && ax.b.x < W / 2 && ax.dir.y < 0) spots.push([4, 12, "start"]);
+        placing: for (const avoid of [avoidAll, avoidFront]) {
+          for (const [x, y, first] of spots) {
+            let an = first, bx = textBox(x, y, an, titles[a]);
+            if (an === "start" && bx.x2 > W - 2) bx = textBox(x, y, (an = "end"), titles[a]);
+            if (bx.x1 < 2 || bx.x2 > W - 2 || bx.y1 < 2 || bx.y2 > H - 2 || hits(bx, taken) || hits(bx, avoid)) continue;
+            taken.push(bx);
+            text(x, y, an, titles[a], "note ttl");
+            break placing;
+          }
+        }
+      }
+      // Where all three are best.
+      const best = S([1, 1, 1]);
+      gAxes.append(s("circle", { class: "best", cx: f1(best.x), cy: f1(best.y), r: 2.5 }));
+      let bx = textBox(best.x + 6, best.y - 6, "start", "best");
+      const bestAt = bx.x2 > W - 2 ? [best.x - 6, "end"] : [best.x + 6, "start"];
+      bx = textBox(bestAt[0], best.y - 6, bestAt[1], "best");
+      if (bx.y1 >= 2 && bx.x1 >= 2) {
+        text(bestAt[0], best.y - 6, bestAt[1], "best", "note");
+        taken.push(bx);
+      }
+    }
+
+    // Stems drop each mark to the floor, frontier stems on top.
+    if (!flat && cam.tilt >= 6) {
+      for (const d of [...drawn].sort((a, b) => a.on - b.on)) {
+        const g = s("g", { class: color(d.ser) });
+        g.append(seg(d, d.foot, d.on ? "stem on" : "stem"), s("circle", { class: d.on ? "foot on" : "foot", cx: f1(d.foot.x), cy: f1(d.foot.y), r: 1.8 }));
+        gStems.append(g);
+      }
+    }
+    for (const x of series) {
+      const pts = drawn.filter((d) => d.ser === x);
+      if (pts.length < 2) continue;
+      const g = s("g", { class: color(x) });
+      g.append(s("path", { class: "lpath", d: pathOf(pts) }));
+      gPaths.append(g);
+    }
+    // Far marks first when turned; beaten marks first when flat.
+    const order = [...drawn].sort(flat
+      ? (a, b) => a.on - b.on || a.depth - b.depth || byPointId(a, b)
+      : (a, b) => a.depth - b.depth || a.on - b.on || byPointId(a, b));
+    for (const d of order) {
+      const g = s("g", { class: color(d.ser) });
+      const x = Math.round(d.x * 10) / 10, y = Math.round(d.y * 10) / 10;
+      if (!d.on) g.append(shapeEl(shape(d.ser), x, y, "m-halo"));
+      const mark = shapeEl(shape(d.ser), x, y, d.on ? "m-on" : "m-off");
+      mark.setAttribute("data-id", d.p.id);
+      g.append(mark);
+      gMarks.append(g);
+      if (uncShown(d.p)) gRings.append(s("circle", { class: "unc", cx: x, cy: y, r: 9 }));
+      if (d === tracedD) gRings.append(s("circle", { class: "traced", cx: x, cy: y, r: 12.5 }));
+    }
+    // Labels only at rest: the traced run, then the frontier from the best ratio down.
+    if (!moving()) {
+      const inside = flat
+        ? (b) => b.x1 >= M.l + 1 && b.x2 <= M.l + pw - 1 && b.y1 >= M.t + 1 && b.y2 <= M.t + ph - 1
+        : (b) => b.x1 >= 2 && b.x2 <= W - 2 && b.y1 >= 2 && b.y2 <= H - 2;
+      const place = makePlacer({ drawn, tracedD, boxes: [...taken], inside, layer: gLabels });
+      if (tracedD) place(tracedD, "traced", "strong", 15);
+      for (const d of drawn.filter((q) => q.on).sort((a, b) => a.p.bytes - b.p.bytes || byPointId(a, b))) {
+        place(d, shortLevel(d.p), "", d === tracedD ? 15 : uncShown(d.p) ? 11 : 8);
+      }
+    }
+
+    // Keyboard order follows the picture: left to right, and bottom to top.
+    const byRatio = [...drawn].sort((a, b) => a.x - b.x || b.y - a.y || a.depth - b.depth || byPointId(a, b));
+    const bySpeed = [...drawn].sort((a, b) => b.y - a.y || a.x - b.x || a.depth - b.depth || byPointId(a, b));
+    panels.cd = { svg: svg3, drawn, order, byRatio, bySpeed, gHl, W, H, key, onFront, S, t, flat, walls };
+    if (focusId.cd && !drawnById.has(focusId.cd)) focusId.cd = null;
+
+    for (const [id, prop] of [["turn-3d", "turn"], ["tilt-3d", "tilt"]]) {
+      const deg = Math.round(cam[prop]);
+      $(id).value = String(deg);
+      $(id).setAttribute("aria-valuetext", `${deg}°`);
+      $(id + "-out").textContent = `${deg}°`;
+    }
+    VIEWS.forEach((v, i) => viewBtns[i].setAttribute("aria-pressed", String(atView(v))));
+
+    const fpts = front.map((id) => pById.get(id)).filter(Boolean);
+    const list = fpts.slice(0, 8).map((p) => `${pointName(p)} (${ratioText(p)}, ${speedText(p.c_speed)} and ${speedText(p.d_speed)} MB/s)`).join("; ");
+    const phrase = flat ? flat.phrase : `turned ${Math.round(cam.turn)}°, tilted ${Math.round(cam.tilt)}°`;
+    svg3.setAttribute("aria-label", `Ratio, compression and decompression speed, ${phrase}: ${plural(drawn.length, "point")}. ${B(fpts.length)} on the three-way frontier: ${list}${fpts.length > 8 ? `; and ${B(fpts.length - 8)} more` : ""}. Arrow keys move through the points as drawn; Shift with the arrow keys turns and tilts; 1 to 4 pick a view.`);
+    $("note-3d").textContent = note3(flat, key, fpts);
+
+    if (document.activeElement === svg3 && focusId.cd) {
+      const fd = drawnById.get(focusId.cd);
+      ring("cd", fd.p, "focus");
+      if (!moving()) decorate3(fd.p);
+    }
+  }
+  function note3(flat, key, fpts) {
+    if (!flat) {
+      return "Filled marks are on the three-way frontier: no other shown point is as small, as fast to compress and as fast to decompress. Stems drop each mark to the floor; the shading on the floor, back wall and side wall is what each two-way frontier beats. In a turned view, screen position alone can mislead: hover a mark or pick a flat view.";
+    }
+    const many = (n, one, more) => (n === 1 ? one : more);
+    if (flat.key === "side") {
+      // A frontier point beaten at both speeds alone must have the better ratio.
+      const n = fpts.filter((p) => fpts.some((q) => q.c_speed >= p.c_speed && q.d_speed >= p.d_speed && (q.c_speed > p.c_speed || q.d_speed > p.d_speed))).length;
+      return "Seen from the high-ratio side; ratio is hidden. " + (n
+        ? `${B(n)} filled ${many(n, "mark looks", "marks look")} beaten here: ${many(n, "it has", "each has")} a better ratio than what beats ${many(n, "it", "them")} here.`
+        : "Every filled mark is also on this view's frontier.");
+    }
+    const top = flat.key === "top";
+    const onPanel = new Set(frontOf(top ? "c" : "d", key));
+    const n = fpts.filter((p) => !onPanel.has(p.id)).length;
+    return (top ? "Seen from above: ratio against compression speed; decompression speed is hidden. " : "Seen from the front: ratio against decompression speed; compression speed is hidden. ") + (n
+      ? `${B(n)} filled ${many(n, "mark looks", "marks look")} beaten here: ${many(n, "it", "each")} ${top ? "decompresses" : "compresses"} faster than what beats ${many(n, "it", "them")} here.`
+      : "Every filled mark is also on this view's frontier.");
+  }
+  // Hover and focus extras in the 3D view: dotted guides to the walls and a path
+  // along the axes to the frontier point that beats this one.
+  function decorate3(p) {
+    const P = panels.cd;
+    const d = P && P.drawn.find((q) => q.p === p);
+    if (!d) return;
+    if (P.t < 1) {
+      for (const wl of P.walls) {
+        const q = P.S(wl.lift(wl.pair(d.n)));
+        P.gHl.append(seg(d, q, "guide"), s("circle", { class: "gfoot", cx: f1(q.x), cy: f1(q.y), r: 2 }));
+      }
+    }
+    if (d.on) return;
+    const fid = (doc.frontiers.cd.beaten_by[P.key] || {})[p.id];
+    const f = fid && P.drawn.find((q) => q.p.id === fid);
+    if (!f) return;
+    const a = d.n, b = f.n;
+    P.gHl.append(s("path", { class: "beat", d: pathOf([a, [b[0], a[1], a[2]], [b[0], b[1], a[2]], b].map(P.S)) }));
+    ring("cd", f.p, "hl");
+  }
+  function beater3(p, key) {
+    const fid = (doc.frontiers.cd.beaten_by[key] || {})[p.id];
+    return fid ? pById.get(fid) || null : null;
+  }
+  function sentence3(p) {
+    const key = panels.cd ? panels.cd.key : subsetKey(shownIds());
+    const on = frontOf("cd", key).includes(p.id);
+    const f = on ? null : beater3(p, key);
+    return `${pointName(p)}: ${ratioText(p)}, ${speedText(p.c_speed)} MB/s compression, ${speedText(p.d_speed)} MB/s decompression, ${on ? "on the three-way frontier" : f ? "beaten by " + pointName(f) : "beaten"}.`;
+  }
+  function tipNodes3(p) {
+    const P = panels.cd, key = P.key;
+    const x = serById.get(p.series);
+    const on = P.onFront.has(p.id);
+    const f = on ? null : beater3(p, key);
+    const n = p.c_samples.length;
+    // A point on the three-way frontier that a flat view's frontier leaves out is
+    // beaten there only by points that are slower at the other speed.
+    const panelRow = (axis, verb) => {
+      if (!on || frontOf(axis, key).includes(p.id)) return null;
+      const bid = (doc.frontiers[axis].beaten_by[key] || {})[p.id];
+      const b = bid && pById.get(bid);
+      if (!b) return null;
+      return `looks beaten by ${pointName(b)}, which ${verb} slower (${speedText(b[(axis === "c" ? "d" : "c") + "_speed"])} MB/s)`;
+    };
+    const notes = [
+      ...p.flags.c.map((g) => FLAG_WORDS[g] && "compression: " + FLAG_WORDS[g]),
+      ...p.flags.d.map((g) => FLAG_WORDS[g] && "decompression: " + FLAG_WORDS[g]),
+      ...p.flags.both.map((g) => FLAG_WORDS[g]),
+    ].filter(Boolean);
+    return [
+      h("div", { class: "v", text: `${ratioText(p)} · C ${speedText(p.c_speed)} · D ${speedText(p.d_speed)} MB/s` }),
+      h("div", { class: "who" }, [seriesGlyph(x, 12), h("span", { text: `${x.label} ${p.level_label}` })]),
+      kv([
+        ["compressed", `${B(p.bytes)} B of ${B(total)} B`],
+        ["compression", `${speedText(p.c_speed)} MB/s` + (uncertain(p, "c") ? " ~" : "")],
+        ["decompression", `${speedText(p.d_speed)} MB/s` + (uncertain(p, "d") ? " ~" : "")],
+        ["runs", n > 1 ? `best of ${n}` : n ? "one run" : null],
+        ["frontier", on
+          ? "on the three-way frontier" + (shownIds().length < series.length ? " of the shown series" : "")
+          : f ? `beaten by ${pointName(f)}: ${ratioText(f) === ratioText(p) ? `${B(f.bytes)} B` : ratioText(f)}, C ${speedText(f.c_speed)}, D ${speedText(f.d_speed)} MB/s` : "beaten"],
+        ["ratio × compression", panelRow("c", "decompresses")],
+        ["ratio × decompression", panelRow("d", "compresses")],
+        ["notes", notes.join("; ")],
+        ["command", commandText(p)],
+      ]),
+      p.id === traced ? goLine() : null,
+    ];
+  }
+  function cancelAnim() {
+    if (anim) cancelAnimationFrame(anim.id);
+    anim = null;
+  }
+  // Show the focused point again after the view changed under it.
+  function refocus3() {
+    const P = panels.cd;
+    const d = P && document.activeElement === svg3 && focusId.cd && P.drawn.find((q) => q.p.id === focusId.cd);
+    if (d) showPoint(d.p, anchorAt(P, d));
+  }
+  function animateTo(v) {
+    cancelAnim();
+    const done = () => {
+      cam.turn = v.turn;
+      cam.tilt = v.tilt;
+      anim = null;
+      drawCube();
+      refocus3();
+    };
+    if (reduceMotion()) { done(); return; }
+    const from = { turn: cam.turn, tilt: cam.tilt }, t0 = performance.now();
+    const step = (now) => {
+      const e = Math.min(1, Math.max(0, (now - t0) / 450));
+      if (e >= 1) { done(); return; }
+      const k = e < 0.5 ? 4 * e ** 3 : 1 - (-2 * e + 2) ** 3 / 2;
+      cam.turn = from.turn + (v.turn - from.turn) * k;
+      cam.tilt = from.tilt + (v.tilt - from.tilt) * k;
+      anim.id = requestAnimationFrame(step);
+      hideTip();
+      drawCube();
+    };
+    anim = { id: requestAnimationFrame(step), target: v };
+  }
+  function renderFront3() {
+    if (!svg3) return;
+    const key = subsetKey(shownIds());
+    if (`${key}|${showAllFront}` === lastFrontKey) return;
+    lastFrontKey = `${key}|${showAllFront}`;
+    const refocusMore = document.activeElement && document.activeElement.id === "front-3d-more";
+    const pts = frontOf("cd", key).map((id) => pById.get(id)).filter(Boolean);
+    const shown = panels.cd ? panels.cd.drawn.length : 0;
+    const tb = h("tbody");
+    for (const p of showAllFront ? pts : pts.slice(0, 12)) {
+      const x = serById.get(p.series);
+      const row = h("tr", { tabindex: "0" }, [
+        h("td", { class: "series" }, [seriesGlyph(x, 12), " ", x.label, " ", h("span", { class: "lv", text: p.level_label })]),
+        h("td", { text: ratioText(p) }),
+        h("td", { text: speedText(p.c_speed) + (uncertain(p, "c") ? "~" : "") }),
+        h("td", { text: speedText(p.d_speed) + (uncertain(p, "d") ? "~" : "") }),
+      ]);
+      const light = () => {
+        clearRings();
+        ring("cd", p, "hl");
+        say(sentence3(p));
+      };
+      row.addEventListener("pointerenter", light);
+      row.addEventListener("focus", light);
+      row.addEventListener("pointerleave", clearRings);
+      row.addEventListener("blur", clearRings);
+      tb.append(row);
+    }
+    const kids = [
+      h("p", { class: "label", text: "On the three-way frontier" }),
+      h("p", { class: "hint", text: `${B(pts.length)} of ${plural(shown, "shown point")}, best ratio first; speeds in MB/s.` }),
+      h("div", { class: "table-wrap" }, h("table", { class: "data f3" }, [
+        h("thead", {}, h("tr", {}, ["Point", "Ratio", "Comp.", "Decomp."].map((t) => h("th", { text: t })))),
+        tb,
+      ])),
+    ];
+    if (pts.length > 12) {
+      const more = h("button", { type: "button", class: "more", id: "front-3d-more", "aria-expanded": String(showAllFront), text: showAllFront ? "Show the first 12" : `Show all ${B(pts.length)}` });
+      more.addEventListener("click", () => { showAllFront = !showAllFront; renderFront3(); });
+      kids.push(more);
+    }
+    const onC = new Set(frontOf("c", key)), onD = new Set(frontOf("d", key));
+    const only = pts.filter((p) => !onC.has(p.id) && !onD.has(p.id));
+    if (only.length) {
+      const m = only.length, names = only.slice(0, 3).map(pointName);
+      const who = m === 1 ? names[0] : m === 2 ? names.join(" and ") : m === 3 ? `${names[0]}, ${names[1]} and ${names[2]}` : `${names.join(", ")} and ${B(m - 3)} more`;
+      kids.push(h("p", { class: "hint", text: `${who} ${m === 1 ? "is" : "are"} on neither flat view's frontier (ratio × compression, ratio × decompression): ${m === 1 ? "it wins" : "they win"} only when both speeds count.` }));
+    }
+    $("front-3d").replaceChildren(...kids);
+    if (refocusMore && $("front-3d-more")) $("front-3d-more").focus({ preventScroll: true });
+  }
+  function setup3() {
+    viewBtns = VIEWS.map((v) => {
+      const b = h("button", { type: "button", "aria-pressed": "false", title: v.title }, [h("span", { class: "long", text: v.name }), h("span", { class: "short", text: v.short })]);
+      b.addEventListener("click", () => { animateTo(v); say(viewSay(v)); });
+      return b;
+    });
+    $("views-3d").replaceChildren(...viewBtns);
+    // One element for good: redraws replace its children, so focus and pointer
+    // capture survive them.
+    svg3 = s("svg", { tabindex: "0", role: "img", "aria-describedby": "note-3d" });
+    $("plot-3d").replaceChildren(svg3);
+
+    const svgPoint = (e) => {
+      const r = svg3.getBoundingClientRect();
+      const k = panels.cd.W / r.width;
+      return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k };
+    };
+    // The topmost mark within 7 px, else the nearest within 24 px.
+    const pick = (e) => {
+      const P = panels.cd;
+      if (!P || !P.order.length) return null;
+      const at = svgPoint(e);
+      let close = null, best = null, bd = 24 * 24;
+      for (const d of P.order) {
+        const dd = (d.x - at.x) ** 2 + (d.y - at.y) ** 2;
+        if (dd <= 49) close = d;
+        if (dd <= bd) { bd = dd; best = d; }
+      }
+      return close || best;
+    };
+    const unhover = () => {
+      if (!hoverId) return;
+      hoverId = null;
+      hideTip();
+      clearRings();
+    };
+    svg3.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      grab = { x: e.clientX, y: e.clientY, turn: cam.turn, tilt: cam.tilt, pointerId: e.pointerId };
+    });
+    svg3.addEventListener("pointermove", (e) => {
+      if (grab && e.pointerId === grab.pointerId && !dragging && Math.hypot(e.clientX - grab.x, e.clientY - grab.y) >= 4) {
+        dragging = true;
+        try { svg3.setPointerCapture(e.pointerId); } catch (err) { /* the pointer is already gone */ }
+        cancelAnim();
+        hoverId = null;
+        hideTip();
+        clearRings();
+        svg3.classList.add("turning");
+        svg3.style.cursor = "";
+      }
+      if (dragging) {
+        if (e.pointerId !== grab.pointerId) return;
+        // Left shows more of the high-ratio side; down looks from higher up.
+        cam.turn = clampAngle(Math.round(grab.turn - 0.4 * (e.clientX - grab.x)));
+        cam.tilt = clampAngle(Math.round(grab.tilt + 0.4 * (e.clientY - grab.y)));
+        requestCube();
+        return;
+      }
+      const d = pick(e);
+      svg3.style.cursor = d && d.p.id === traced && explorerShown() ? "pointer" : "";
+      if (!d) { unhover(); return; }
+      hoverId = d.p.id;
+      showPoint(d.p, { currentTarget: svg3, clientX: e.clientX, clientY: e.clientY });
+    });
+    svg3.addEventListener("pointerleave", () => { if (!dragging) unhover(); });
+    const release = (e, click) => {
+      if (!grab || e.pointerId !== grab.pointerId) return;
+      if (dragging) {
+        dragging = false;
+        svg3.classList.remove("turning");
+        const snap = VIEWS.find((v) => Math.abs(cam.turn - v.turn) <= 4 && Math.abs(cam.tilt - v.tilt) <= 4);
+        if (snap) {
+          animateTo(snap);
+          say(viewSay(snap));
+        } else {
+          drawCube();
+          say(stepSay());
+        }
+      } else if (click) {
+        const d = pick(e);
+        if (d && d.p.id === traced) goExplorer();
+      }
+      grab = null;
+    };
+    svg3.addEventListener("pointerup", (e) => release(e, true));
+    svg3.addEventListener("pointercancel", (e) => release(e, false));
+
+    for (const [id, prop] of [["turn-3d", "turn"], ["tilt-3d", "tilt"]]) {
+      const input = $(id);
+      input.addEventListener("input", () => {
+        cancelAnim();
+        sliderHeld = true;
+        cam[prop] = clampAngle(+input.value);
+        hideTip();
+        requestCube();
+      });
+      // A slider let go where it started fires no change event.
+      const letGo = () => {
+        if (!sliderHeld) return;
+        sliderHeld = false;
+        drawCube();
+      };
+      input.addEventListener("change", () => {
+        cam[prop] = clampAngle(+input.value);
+        sliderHeld = false;
+        drawCube();
+        say(stepSay());
+      });
+      input.addEventListener("pointerup", letGo);
+      input.addEventListener("keyup", letGo);
+      input.addEventListener("blur", letGo);
+    }
+
+    const focusOn = (id) => {
+      focusId.cd = id;
+      const d = panels.cd.drawn.find((q) => q.p.id === id);
+      if (d) showPoint(d.p, anchorAt(panels.cd, d));
+    };
+    svg3.addEventListener("focus", () => {
+      const P = panels.cd;
+      if (!svg3.matches(":focus-visible") || !P || !P.drawn.length) return;
+      const keep = P.drawn.find((q) => q.p.id === focusId.cd);
+      const start = keep || P.drawn.find((q) => q.p.id === traced) || P.byRatio.find((q) => q.on) || P.byRatio[0];
+      focusOn(start.p.id);
+    });
+    svg3.addEventListener("blur", () => { hideTip(); clearRings(); });
+    const STEPS = { ArrowLeft: ["turn", -5], ArrowRight: ["turn", 5], ArrowUp: ["tilt", 5], ArrowDown: ["tilt", -5] };
+    svg3.addEventListener("keydown", (e) => {
+      const P = panels.cd;
+      if (e.ctrlKey || e.metaKey || e.altKey || !P || !P.drawn.length) return;
+      if (e.shiftKey && STEPS[e.key]) {
+        e.preventDefault();
+        cancelAnim();
+        const [prop, by] = STEPS[e.key];
+        cam[prop] = clampAngle(Math.round(cam[prop] + by));
+        drawCube();
+        say(stepSay());
+        refocus3();
+        return;
+      }
+      if (/^[1-4]$/.test(e.key)) {
+        e.preventDefault();
+        const v = VIEWS[+e.key - 1];
+        animateTo(v);
+        say(viewSay(v));
+        return;
+      }
+      if (moveFocus(e, P, focusId.cd, focusOn)) return;
+      if (e.key === "Escape") { e.preventDefault(); hideTip(); clearRings(); focusId.cd = null; }
+      else if (e.key === "Enter" || e.key === " ") {
+        if (focusId.cd === traced && traced && explorerShown()) { e.preventDefault(); goExplorer(); }
+      }
+    });
+  }
+
+  let lastWidth = -1;
+  function drawAll() {
+    hideTip();
+    drawCube();
+    renderFront3();
+    lastWidth = $("bench-panels").clientWidth;
+  }
+  if (ok.length && has3) {
+    setup3();
+    drawAll();
+    let pending = false;
+    new ResizeObserver(() => {
+      if (pending || $("bench-panels").clientWidth === lastWidth) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; if ($("bench-panels").clientWidth) drawAll(); });
+    }).observe($("bench-panels"));
+  } else {
+    $("bench-panels").hidden = true;
+    $("bench-keys").hidden = true;
+    $("bench-all").open = true;
+  }
+
+  /* All results */
+  const everything = subsetKey(series.map((x) => x.id));
+  const onC = new Set(frontOf("c", everything)), onD = new Set(frontOf("d", everything));
+  const on3 = has3 ? new Set(frontOf("cd", everything)) : new Set();
+  const table = $("bench-table");
+  table.replaceChildren(h("thead", {}, h("tr", {}, ["Series", "Level", "Bytes", "Ratio", "Comp. MB/s", "Decomp. MB/s", "Frontier", "Notes"].map((t) =>
+    h("th", t === "Frontier" ? { text: t, title: "On the frontier of all series: C for ratio vs compression speed, D for ratio vs decompression speed, 3D for ratio vs both speeds at once" } : t === "Notes" ? { text: t, class: "notes" } : { text: t })))));
+  const tb = h("tbody");
+  for (const x of series) {
+    for (const p of allOf.get(x.id)) {
+      const cells = [h("td", { class: "series" }, [seriesGlyph(x, 12), " ", x.label]), h("td", { text: p.level_label })];
+      if (p.status === "ok") {
+        const notes = [];
+        if (p.id === traced) notes.push(explorerShown() ? "traced (reviewed below)" : "traced");
+        for (const f of ["contended", "short"]) {
+          const axes = ["c", "d"].filter((a) => p.flags[a].includes(f)).map((a) => a.toUpperCase());
+          if (axes.length) notes.push(`${f === "contended" ? "core busy" : "short run"} (${axes.join(" ")})`);
+        }
+        for (const f of p.flags.both) notes.push({ fallback: "fell back to generic compression", quick: "quick", unpinned: "unpinned" }[f]);
+        cells.push(
+          h("td", { text: B(p.bytes) }),
+          h("td", { text: ratioText(p) }),
+          h("td", { text: speedText(p.c_speed) + (uncertain(p, "c") ? "~" : "") }),
+          h("td", { text: speedText(p.d_speed) + (uncertain(p, "d") ? "~" : "") }),
+          h("td", { text: [onC.has(p.id) && "C", onD.has(p.id) && "D", on3.has(p.id) && "3D"].filter(Boolean).join(" ") }),
+          h("td", { class: "notes", text: notes.filter(Boolean).join("; ") }),
+        );
+      } else {
+        cells.push(...[0, 1, 2, 3].map(() => h("td", { class: "fail", text: "—" })), h("td"));
+        cells.push(h("td", { class: "notes bad", text: `${p.status}${p.error ? ": " + clip(p.error, 500) : ""}` }));
+      }
+      tb.append(h("tr", {}, cells));
+    }
+  }
+  table.append(tb);
+  const notMeasured = doc.points.length - ok.length;
+  $("bench-all-summary").textContent = `All results (${plural(doc.points.length, "point")}${notMeasured ? `, ${B(notMeasured)} without a result` : ""})`;
+
+  /* How this was measured */
+  const how = [];
+  const code = (t) => h("code", { text: t });
+  const line = (...kids) => h("div", {}, kids.filter((k) => k != null && k !== ""));
+  const row = (term, ...lines) => {
+    const kept = lines.filter(Boolean);
+    if (kept.length) how.push(h("dt", { text: term }), h("dd", {}, kept));
+  };
+  const joinDot = (parts) => parts.filter((x) => x != null && x !== "").join(" · ");
+  row("Input", line(code(doc.input.name || "(unnamed)"), ` · ${B(total)} bytes`, doc.input.sha256 ? ` · sha256 ${doc.input.sha256.slice(0, 8)}` : null));
+  row("Machine", line(joinDot([m.cpu, m.logical_cpus != null ? plural(m.logical_cpus, "logical CPU") : null, m.kernel ? "Linux " + m.kernel : null, m.python ? "Python " + m.python : null, m.governor ? "CPU governor " + m.governor : null]) || "not recorded"));
+  row("Core", line(m.pin === "none" || m.core == null
+    ? "Not pinned: the runs could move between cores."
+    : `Core ${m.core} (${m.core_choice === "auto" ? "the least busy core, picked automatically" : "chosen with --core"}), pinned with ${m.pin === "taskset" ? "taskset -c" : "sched_setaffinity"}. Before each run the core had to be quiet; a run is marked when other work used the core anyway.`));
+  if (uses("zli")) {
+    row("zli", line(code(zli.path || "zli"), zli.sha256 ? ` · sha256 ${zli.sha256.slice(0, 8)}` : null),
+      line(joinDot([zli.version, zli.bytes != null ? `${B(zli.bytes)} bytes` : null, zli.build_dir ? `build directory ${zli.build_dir}` : null])),
+      zli.note ? line("Build note: ", zli.note) : line("No build note was given."));
+  }
+  if (uses("zstd")) row("zstd", line(code(zstd.path || "zstd"), zstd.sha256 ? ` · sha256 ${zstd.sha256.slice(0, 8)}` : null), line(zstd.version ? "version " + zstd.version : ""));
+  const envs = Object.entries(st.env || {});
+  row("Settings",
+    st.levels ? line("Levels: ", code(st.levels)) : null,
+    line(joinDot([
+      st.quick ? "quick: one pass, no repetition" : st.rounds ? `best of ${fewer ? "up to " : ""}${plural(st.rounds, "round")}, each a pass over every level and series` : null,
+      st.min_time_s != null ? `at least ${st.min_time_s} s of timed work per zli sample` : null,
+      st.timeout_s != null ? `a run is stopped after ${B(st.timeout_s)} s` : null,
+    ])),
+    envs.length ? line("Environment: ", ...envs.flatMap(([k, v], i) => [i ? ", " : null, code(`${k}=${v}`)])) : line("No allocator or loader variables were set."));
+  row("Series", ...series.map((x) => line(x.label, ": ", code([x.tool, ...x.args].join(" ")))));
+  row("Measured", line(joinDot([doc.created, doc.elapsed_s != null ? `took ${doc.elapsed_s.toFixed(1)} s` : null, doc.complete ? "complete" : doc.stopped === "interrupted" ? "interrupted" : "incomplete"])));
+  row("Traced run", line(linkSentence()));
+  row("Notes", ...doc.notes.map((n) => line(n)));
+  row("Caveats", h("ul", {}, [
+    "zstd sizes are from zstd -b (one-shot, no frame checksum); a .zst file is a few bytes larger.",
+    "OpenZL cuts the input into chunks when the profile has a segmenter (--chunk-size-mb); zstd compresses the whole file.",
+    "zli benchmark allocates the output on every iteration and reports the mean of N iterations per run; zstd -b reuses buffers and reports its fastest loop. Both are then reduced to the best run.",
+    "OpenZL speed depends on how zli was built; compiler flags cannot be read from the binary (see the build note).",
+    "Each run used one CPU core; other tenants on a shared machine can only slow a run down, so the best run is kept.",
+  ].map((t) => h("li", { text: t }))));
+  $("bench-how").replaceChildren(...how);
+}
+
 /* ---------- Served pages: open more traces, switch between reviews ---------- */
 function setupServed(served) {
   // A landing page reached without its trailing slash ("/proxy/8765") still needs "/proxy/8765/" as root.
@@ -768,7 +2056,7 @@ function setupServed(served) {
   const button = $("open-trace"), status = $("serve-status"), reviews = $("reviews");
   const say = (text, error = false) => { status.textContent = text; status.classList.toggle("error", error); };
   $("serve-bar").hidden = false;
-  let maxUpload = null;
+  let maxUpload = null, maxBenchUpload = null;
 
   // Traces are reviewed one after another; files opened meanwhile wait their turn.
   const queue = [];
@@ -776,7 +2064,10 @@ function setupServed(served) {
   function openFiles(files) {
     const list = Array.from(files || []);
     if (!list.length) return;
-    queue.push(...list);
+    // Files opened together form a batch: its traces go first, and its results
+    // go to the review of its trace.
+    const batch = { traceId: null };
+    queue.push(...list.map((file) => ({ file, results: null, batch })));
     if (busy) {
       say(`${status.textContent.replace(/ \d+ more waiting\.$/, "")} ${queue.length} more waiting.`);
       return;
@@ -787,43 +2078,69 @@ function setupServed(served) {
     busy = true;
     status.setAttribute("aria-busy", "true");
     let done = 0, last = null, name = "";
+    const pages = [];
     try {
       while (queue.length) {
-        const file = queue.shift();
+        const same = queue.filter((item) => item.batch === queue[0].batch);
+        for (const item of same) if (item.results == null) item.results = await isResults(item.file);
+        const pick = same.find((item) => !item.results) || same[0];
+        queue.splice(queue.indexOf(pick), 1);
+        const { file, results, batch } = pick;
         done++;
         name = file.name;
         const of = done + queue.length > 1 ? ` (${done} of ${done + queue.length})` : "";
-        say(`Reviewing ${file.name}${of}, ${B(file.size)} bytes…`);
-        last = await upload(file);
+        say(`${results ? "Reading results from" : "Reviewing"} ${file.name}${of}, ${B(file.size)} bytes…`);
+        const answer = await upload(file, results, batch.traceId ?? served.id);
+        if (!results) batch.traceId = answer.id;
+        last = answer.url;
+        if (!pages.includes(last.href)) pages.push(last.href);
       }
-      say(done > 1 ? `Opening the last of ${done} reviews…` : `Opening the review of ${name}…`);
-      location.assign(last);
+      say(pages.length > 1 ? `Opening the last of ${pages.length} pages…` : `Opening the page of ${name}…`);
+      // Results added to this very page come back to the same address: reload it.
+      if (last.href.split("#")[0] === location.href.split("#")[0]) location.reload();
+      else location.assign(last);
     } catch (e) {
       const skipped = queue.splice(0).length;
       const added = done - 1;
-      say(e.message + (added ? ` ${plural(added, "earlier file")} ${added === 1 ? "was" : "were"} added to Reviews.` : "") + (skipped ? ` ${plural(skipped, "other file")} ${skipped === 1 ? "was" : "were"} not opened.` : ""), true);
+      const here = location.href.split("#")[0];
+      say(e.message + (added ? ` ${plural(added, "earlier file")} ${added === 1 ? "was" : "were"} opened` + (pages.includes(here) ? "; reload this page to see what was added to it." : "; see Reviews.") : "") + (skipped ? ` ${plural(skipped, "other file")} ${skipped === 1 ? "was" : "were"} not opened.` : ""), true);
       busy = false;
       status.removeAttribute("aria-busy");
       refreshReviews();
     }
   }
-  async function upload(file) {
-    if (maxUpload != null && file.size > maxUpload) throw new Error(`${file.name} is ${B(file.size)} bytes; this server accepts traces up to ${B(maxUpload)} bytes.`);
+  // Results files are JSON; traces are CBOR or DOT text, which never start with "{".
+  async function isResults(file) {
+    if (/\.json$/i.test(file.name)) return true;
+    try {
+      return (await file.slice(0, 4096).text()).trimStart().startsWith("{");
+    } catch (e) {
+      return false;
+    }
+  }
+  async function upload(file, results, reviewId) {
+    const limit = results ? maxBenchUpload : maxUpload;
+    if (limit != null && file.size > limit) throw new Error(`${file.name} is ${B(file.size)} bytes; this server accepts ${results ? "results files" : "traces"} up to ${B(limit)} bytes.`);
     try {
       await file.slice(0, 1).arrayBuffer();
     } catch (e) {
       throw new Error(`${file.name} is a folder or can't be read.`);
     }
+    // Results go to the given review, or become a page of their own.
+    const target = !results ? api : reviewId != null ? new URL(`api/reviews/${reviewId}/benchmark`, root) : api;
+    const headers = results
+      ? { "Content-Type": "application/json", "X-Codec-Reviewer": "benchmark", "X-Trace-Name": encodeURIComponent(file.name) }
+      : { "Content-Type": "application/octet-stream", "X-Codec-Reviewer": "upload", "X-Trace-Name": encodeURIComponent(file.name) };
     let res;
     try {
-      res = await fetch(api, { method: "POST", body: file, headers: { "Content-Type": "application/octet-stream", "X-Codec-Reviewer": "upload", "X-Trace-Name": encodeURIComponent(file.name) } });
+      res = await fetch(target, { method: "POST", body: file, headers });
     } catch (e) {
       const reachable = await fetch(api, { cache: "no-store" }).then((r) => r.ok, () => false);
       throw new Error(reachable ? `Sending ${file.name} failed. If the file was moved or changed, choose it again.` : "The review server is not reachable. Is codec_reviewer.py --serve still running?");
     }
     const answer = await res.json().catch(() => null);
     if (!res.ok || !answer || typeof answer.url !== "string") throw new Error((answer && answer.error) || `The server answered ${res.status} ${res.statusText}.`);
-    return new URL(answer.url, root);
+    return { id: answer.id, url: new URL(answer.url, root) };
   }
   button.addEventListener("click", () => $("trace-file").click());
   $("trace-file").addEventListener("change", (e) => {
@@ -849,7 +2166,10 @@ function setupServed(served) {
 
   // Reviews this server keeps, newest first, as plain links. Refreshed when the tab comes back,
   // so traces added from the command line or another tab show up.
-  const label = (r) => r.failed ? ["compression failed", true] : r.input && r.bytes ? [`${(r.input / r.bytes).toFixed(2)}×`, false] : ["", false];
+  const label = (r) => {
+    const [text, bad] = r.failed ? ["compression failed", true] : r.input && r.bytes ? [`${(r.input / r.bytes).toFixed(2)}×`, false] : ["", false];
+    return [r.bench ? (text ? text + " · vs zstd" : "vs zstd") : text, bad];
+  };
   async function refreshReviews() {
     let list;
     try {
@@ -859,6 +2179,7 @@ function setupServed(served) {
     }
     if (!list || !Array.isArray(list.reviews)) return;
     maxUpload = typeof list.max_upload === "number" ? list.max_upload : null;
+    maxBenchUpload = typeof list.max_bench_upload === "number" ? list.max_bench_upload : null;
     const items = list.reviews.map((r) => {
       const [result, bad] = label(r);
       const link = h("a", { href: new URL(`r/${r.id}`, root).href }, [
@@ -873,7 +2194,7 @@ function setupServed(served) {
     $("reviews-summary").textContent = `Reviews (${list.reviews.length})`;
     reviews.hidden = !list.reviews.some((r) => r.id !== served.id);
     if (served.id == null && !busy && !status.classList.contains("error") && list.reviews.length) {
-      say(`${plural(list.reviews.length, "review")} ${list.reviews.length === 1 ? "is" : "are"} ready under Reviews, or open another trace.`);
+      say(`${plural(list.reviews.length, "review")} ${list.reviews.length === 1 ? "is" : "are"} ready under Reviews, or open another file.`);
     }
   }
   refreshReviews();
@@ -886,7 +2207,13 @@ function setupServed(served) {
 }
 
 if (DATA.served) setupServed(DATA.served);
-if (DATA.empty) {
+if (DATA.bench_only) {
+  $("kind").textContent = "Ratio vs speed";
+  $("file").textContent = DATA.file || "Results";
+  $("explorer").hidden = true;
+  $("coverage").hidden = true;
+  $("about-streams").hidden = true;
+} else if (DATA.empty) {
   const missing = DATA.served && DATA.served.missing;
   $("kind").textContent = "Codec reviewer";
   $("file").textContent = !missing ? "No trace open yet" : missing.reason === "evicted" ? `Review ${missing.id} is no longer kept` : `There is no review ${missing.id}`;
@@ -903,6 +2230,7 @@ if (DATA.empty) {
   $("legend").replaceChildren(...FAMILIES.map((f) => h("span", {}, [h("i", { class: "sw " + f.key }), f.name])));
   renderAll();
 }
+setupBench();
 </script>
 </body>
 </html>
