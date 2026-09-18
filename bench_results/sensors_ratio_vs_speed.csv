@@ -1,0 +1,18 @@
+Series,Level,Bytes,Ratio,Comp. MB/s,Decomp. MB/s,Frontier,Notes
+OpenZL -p parquet,-l 1,537684,5.3731,366.485,1816.1,C D 3D,
+OpenZL -p parquet,-l 2,539316,5.3568,311.488,1748.43,,
+OpenZL -p parquet,-l 3,543520,5.3154,303.917,1754.95,,
+OpenZL -p parquet,-l 4,577403,5.0035,134.879,1108.86,,
+OpenZL -p parquet,-l 5,567939,5.0868,125.742,1159.53,,
+OpenZL -p parquet,-l 6,562193,5.1388,121.18,1179.88,,traced
+OpenZL -p parquet,-l 7,560396,5.1553,115.341,1186.67,,
+OpenZL -p parquet,-l 8,559403,5.1645,110.799,1189.14,,
+OpenZL -p parquet,-l 9,559314,5.1653,106.59,1184.58,,
+OpenZL -p parquet,-l 12,555977,5.1963,63.7167,1192.88,,
+OpenZL -p parquet,-l 15,552914,5.2251,44.6435,1186.21,,
+OpenZL -p parquet,-l 19,546284,5.2885,8.39365,1163.02,,short run (D)
+OpenZL -p parquet,-l 22,546214,5.2892,6.56989,1158.32,,short run (D)
+zstd,-3,713069,4.0515,321.95,1280.5,,
+zstd,-6,681398,4.2398,116.77,1410.2,,
+zstd,-9,669274,4.3166,76.77,1486.3,,
+zstd,-12,660358,4.3749,36.08,1571.8,,

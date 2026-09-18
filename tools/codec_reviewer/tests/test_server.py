@@ -5,6 +5,7 @@ import http.server
 import io
 import json
 import os
+import re
 import select
 import signal
 import socket
@@ -13,6 +14,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import urllib.parse
 from contextlib import redirect_stderr
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +26,7 @@ import html_report  # noqa: E402
 import pareto  # noqa: E402
 import review_server  # noqa: E402
 import trace_builder as tb  # noqa: E402
+from trace_format import load_trace  # noqa: E402
 
 DATA = os.path.join(HERE, "data")
 SENSORS = os.path.join(DATA, "sensors_chunks.cbor.gz")
@@ -508,6 +511,191 @@ class ResultsTest(unittest.TestCase):
             ok, message = review_server.send_benchmark("127.0.0.1", server.port, doc, 7)
             self.assertFalse(ok)
             self.assertIn("no longer kept", message)
+
+
+def saved_name(disposition):
+    """The file names a Content-Disposition gives: (ASCII fallback, filename*)."""
+    match = re.fullmatch(
+        r"""attachment; filename="([ -~]*)"; filename\*=UTF-8''([A-Za-z0-9%._~-]+)""",
+        disposition,
+    )
+    return match.group(1), urllib.parse.unquote(match.group(2))
+
+
+class DownloadTest(unittest.TestCase):
+    def html_page(self, *args):
+        """The page `codec_reviewer.py ARGS --quiet --html OUT` writes."""
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "page.html")
+            err = io.StringIO()
+            with redirect_stderr(err):
+                code = codec_reviewer.main(
+                    [*args, "--quiet", "--html", out], stdout=io.StringIO()
+                )
+            self.assertEqual(code, 0, err.getvalue())
+            return read(out)
+
+    def test_download_is_the_page_html_writes(self):
+        with Server() as server:
+            server.upload("sensors_chunks.cbor.gz", read(SENSORS))
+            status, headers, body = server.request("GET", "/r/1/download")
+            self.assertEqual(status, 200)
+            self.assertEqual(body, self.html_page(SENSORS))
+
+            self.assertEqual(server.send_results(read(BENCH), 1)[0], 200)
+            status, headers, body = server.request("GET", "/r/1/download")
+            self.assertEqual(status, 200)
+            self.assertEqual(body, self.html_page(SENSORS, "--bench-results", BENCH))
+            self.assertEqual(page_bench(body)["trace_link"]["state"], "linked")
+            self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+            self.assertEqual(
+                saved_name(headers["Content-Disposition"]),
+                ("sensors_chunks.review.html", "sensors_chunks.review.html"),
+            )
+            _, page_headers, page = server.request("GET", "/r/1")
+            for key in (
+                "Cache-Control",
+                "X-Content-Type-Options",
+                "Referrer-Policy",
+                "Content-Security-Policy",
+            ):
+                self.assertEqual(headers[key], page_headers[key], key)
+            # The served page has the link, and only its served entry is not in
+            # the download.
+            self.assertIn(b'id="page-download"', page)
+            self.assertNotIn(b'"served"', body)
+            served = b',"served":{"id":1,"root":"../"}'
+            self.assertEqual(page.replace(served, b"", 1), body)
+
+            status, head_headers, head_body = server.request("HEAD", "/r/1/download")
+            self.assertEqual((status, head_body), (200, b""))
+            self.assertEqual(head_headers["Content-Length"], str(len(body)))
+            self.assertEqual(
+                head_headers["Content-Disposition"], headers["Content-Disposition"]
+            )
+
+    def test_download_results_alone(self):
+        doc = bench_doc()
+        with Server() as server:
+            self.assertEqual(server.send_results(read(BENCH))[0], 201)
+            status, headers, body = server.request("GET", "/r/1/download")
+            self.assertEqual(status, 200)
+            self.assertEqual(body, self.html_page("--bench-results", BENCH))
+            self.assertEqual(
+                saved_name(headers["Content-Disposition"])[1],
+                "sensors.parquet.review.html",
+            )
+            # New results rename a page of results alone, and its download.
+            doc["input"]["name"] = "other.dot.gz"
+            self.assertEqual(server.send_results(pareto.dumps(doc).encode(), 1)[0], 200)
+            _, headers, body = server.request("GET", "/r/1/download")
+            self.assertIn(b"<title>Ratio vs speed: other.dot.gz</title>", body)
+            self.assertEqual(
+                saved_name(headers["Content-Disposition"])[1],
+                "other.dot.gz.review.html",
+            )
+
+    def test_file_names(self):
+        for name, trace, saved in (
+            ("sensors.cbor", True, "sensors.review.html"),
+            ("serial.dot", True, "serial.review.html"),
+            (
+                "part-01314-c000.parquet-profile.dot.gz",
+                True,
+                "part-01314-c000.parquet-profile.review.html",
+            ),
+            ("t.CBOR.GZ", True, "t.review.html"),
+            ("t.gz", True, "t.review.html"),
+            ("t.cbor.zst", True, "t.cbor.zst.review.html"),
+            (
+                "sensors.parquet (-p parquet)",
+                True,
+                "sensors.parquet (-p parquet).review.html",
+            ),
+            # Results alone keep their input's name.
+            ("sensors.parquet", False, "sensors.parquet.review.html"),
+            ("x.cbor", False, "x.cbor.review.html"),
+            (
+                'a"b;c\r\nSet-Cookie: x=1.cbor',
+                True,
+                "a_b;c__Set-Cookie_ x=1.review.html",
+            ),
+            ("../etc/passwd.dot", True, "_etc_passwd.review.html"),
+            ("a\\b.dot", True, "a_b.review.html"),
+            ("café 漢字.cbor", True, "café 漢字.review.html"),
+            ("caf\udce9.cbor", True, "caf_.review.html"),
+            ("evil‮lmth.cbor", True, "evil_lmth.review.html"),
+            ("..", True, "review.review.html"),
+            ("x" * 300, False, "x" * 200 + ".review.html"),
+        ):
+            with self.subTest(name=name):
+                self.assertEqual(review_server.download_name(name, trace), saved)
+        self.assertEqual(
+            saved_name(review_server.attachment("café 50%.review.html")),
+            ("caf_ 50_.review.html", "café 50%.review.html"),
+        )
+
+    def test_names_cannot_forge_headers(self):
+        trace = load_trace(SERIAL_DOT)
+        hostile = (
+            'q"uote.cbor',
+            "semi;colon=1.cbor",
+            "cr\r\nSet-Cookie: x=1\r\n\r\nbody.cbor",
+            "café 漢字.dot.gz",
+            "dir/sub\\name.dot",
+        )
+        doc = bench_doc()
+        doc["input"]["name"] = "in\r\nSet-Cookie: y=2;é.parquet"
+        with Server() as server:
+            for name in hostile:
+                server.store.add(html_report.report_data(name, trace))
+            # Results alone come in over HTTP, named by the document.
+            self.assertEqual(server.send_results(pareto.dumps(doc).encode())[0], 201)
+            names = [*hostile, doc["input"]["name"]]
+            for review_id, name in enumerate(names, 1):
+                with self.subTest(name=name):
+                    status, headers, _ = server.request(
+                        "GET", f"/r/{review_id}/download"
+                    )
+                    self.assertEqual(status, 200)
+                    self.assertNotIn("Set-Cookie", headers)
+                    fallback, saved = saved_name(headers["Content-Disposition"])
+                    self.assertEqual(
+                        saved,
+                        review_server.download_name(name, review_id <= len(hostile)),
+                    )
+                    for text in (fallback, saved):
+                        for ch in '"\r\n/\\':
+                            self.assertNotIn(ch, text)
+
+    def test_missing_reviews_and_other_hosts(self):
+        store = review_server.ReviewStore(limit=1)
+        with Server(store=store) as server:
+            server.upload("serial.dot", read(SERIAL_DOT))
+            server.upload("serial.dot", read(SERIAL_DOT))
+            for path, message in (
+                ("/r/1/download", "Review 1 is no longer kept"),
+                ("/r/9/download", "There is no review 9."),
+            ):
+                for method in ("GET", "HEAD"):
+                    with self.subTest(path=path, method=method):
+                        status, headers, body = server.request(method, path)
+                        self.assertEqual(status, 404)
+                        self.assertEqual(
+                            headers["Content-Type"], "text/plain; charset=utf-8"
+                        )
+                        self.assertNotIn("Content-Disposition", headers)
+                        if method == "GET":
+                            self.assertIn(message, body.decode())
+            self.assertEqual(server.request("GET", "/r/2/download")[0], 200)
+            self.assertEqual(server.request("GET", "/r/2/download/")[0], 404)
+            evil = {"Host": f"evil.example:{server.port}"}
+            for method in ("GET", "HEAD"):
+                status, headers, _ = server.request(
+                    method, "/r/2/download", headers=evil
+                )
+                self.assertEqual(status, 403)
+                self.assertNotIn("Content-Disposition", headers)
 
 
 class CommandLineTest(unittest.TestCase):

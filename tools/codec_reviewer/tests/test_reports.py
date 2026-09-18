@@ -287,6 +287,15 @@ class BenchPageTest(unittest.TestCase):
                     html_report.render_parts(self.data)
                 with self.assertRaises(ValueError):
                     html_report.render_html(self.data, self.bench)
+        # A served page's entry goes at the end of the data, before the results.
+        self.with_template(
+            template.replace(
+                "const DATA = __DATA__;\nconst BENCH = __BENCH__;",
+                "const BENCH = __BENCH__;\nconst DATA = __DATA__;",
+            )
+        )
+        with self.assertRaises(ValueError):
+            html_report.render_parts(self.data)
 
     def test_parts_make_the_page(self):
         for bench in (None, self.bench):
@@ -298,6 +307,37 @@ class BenchPageTest(unittest.TestCase):
                 )
                 self.assertTrue(head.endswith("\nconst BENCH = "))
                 self.assertTrue(tail.startswith(";\n"))
+
+    def test_served_parts(self):
+        served = {"id": 7, "root": "../"}
+        # A name that spells markers and JSON cannot move where the entry goes.
+        odd = html_report.report_data('x"},"served":null}__DATA__.cbor', self.trace)
+        for data in (self.data, odd, html_report.bench_only_data(self.bench)):
+            with self.subTest(file=data["file"]):
+                head, entry, rest, tail = html_report.served_parts(data, served)
+                self.assertEqual(entry, ',"served":{"id":7,"root":"../"}')
+                # Without the entry: the page --html writes; with it: the served page.
+                self.assertEqual((head + rest, tail), html_report.render_parts(data))
+                self.assertEqual(
+                    (head + entry + rest, tail),
+                    html_report.render_parts(dict(data, served=served)),
+                )
+        with self.assertRaises(ValueError):
+            html_report.served_parts(dict(self.data, served=served), served)
+
+    def test_page_download_link(self):
+        with open(html_report.TEMPLATE, encoding="utf-8") as f:
+            template = f.read()
+        # In the serve bar, which only a served page shows, and hidden until
+        # the page knows it is a review.
+        start = template.index('<div class="serve-bar" id="serve-bar" hidden>')
+        bar = template[start : template.index("</div>", start)]
+        link = re.search(r'<a [^>]*id="page-download"[^>]*>([^<]*)</a>', bar)
+        self.assertEqual(link.group(1), "Download page (HTML)")
+        for attribute in ('class="dl"', " download ", " hidden ", 'title="'):
+            self.assertIn(attribute, link.group(0))
+        # The address the server answers with the page as one file.
+        self.assertIn("new URL(`r/${served.id}/download`, root)", template)
 
     def test_bench_payload(self):
         self.assertEqual(html_report.bench_payload(None), "null")
@@ -319,6 +359,17 @@ class BenchPageTest(unittest.TestCase):
         )
         self.assertEqual(len(bench["frontiers"]["cd"]["subsets"]), 15)
         for part in ("panel", "plot", "views", "turn", "tilt", "note", "front"):
+            self.assertIn(f'id="{part}-3d"', page)
+        # Its zoom controls, the zoomed range line and the zoom hint.
+        for part in (
+            "zoom",
+            "zoom-out",
+            "zoom-level",
+            "zoom-in",
+            "zoom-fit",
+            "range",
+            "hint",
+        ):
             self.assertIn(f'id="{part}-3d"', page)
         for gone in ('id="plot-c"', 'id="plot-d"', "function drawPanel"):
             self.assertNotIn(gone, page)

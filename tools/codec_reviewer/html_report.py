@@ -32,8 +32,9 @@ TEMPLATE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "report_template.html"
 )
 TOOL = "tools/codec_reviewer"
+DATA_MARKER = "__DATA__"
 BENCH_MARKER = "__BENCH__"
-MARKERS = ("__TITLE__", "__DATA__", BENCH_MARKER)
+MARKERS = ("__TITLE__", DATA_MARKER, BENCH_MARKER)
 
 
 def _node(n: NodeRuns) -> Dict[str, object]:
@@ -243,8 +244,8 @@ def _page_title(data: Dict[str, object]) -> str:
 
 
 @allow_deep_trees
-def render_parts(data: Dict[str, object]) -> Tuple[str, str]:
-    """The page before and after the benchmark marker, with title and data filled in."""
+def _fill_template(data: Dict[str, object]) -> Tuple[str, str, str]:
+    """The filled-in page cut after the data and at the benchmark marker."""
     with open(TEMPLATE, encoding="utf-8") as f:
         template = f.read()
     for marker in MARKERS:
@@ -264,7 +265,33 @@ def render_parts(data: Dict[str, object]) -> Tuple[str, str]:
 
     # Split the template, never a filled-in page: a trace name may spell a marker.
     head, tail = template.split(BENCH_MARKER)
-    return fill(head), fill(tail)
+    if DATA_MARKER not in head:
+        raise ValueError(f"{TEMPLATE} must have {DATA_MARKER} before {BENCH_MARKER}")
+    before, after = head.split(DATA_MARKER)
+    return fill(before) + values[DATA_MARKER], fill(after), fill(tail)
+
+
+def render_parts(data: Dict[str, object]) -> Tuple[str, str]:
+    """The page before and after the benchmark marker, with title and data filled in."""
+    to_data, rest, tail = _fill_template(data)
+    return to_data + rest, tail
+
+
+def served_parts(
+    data: Dict[str, object], served: Dict[str, object]
+) -> Tuple[str, str, str, str]:
+    """A served page cut around its ``served`` entry: (head, entry, rest, tail).
+
+    ``head + entry + rest`` and ``tail`` are render_parts(dict(data, served=served)),
+    since JSON writes the key added last just before the data's closing brace.
+    Without the entry they are render_parts(data): the self-contained page. A server
+    keeps one copy of the page for both.
+    """
+    if not data or "served" in data:
+        raise ValueError("the page data must not be empty or served already")
+    to_data, rest, tail = _fill_template(data)
+    entry = json.dumps({"served": served}, separators=(",", ":"))[1:-1]
+    return to_data[:-1], "," + _script_json(entry), "}" + rest, tail
 
 
 def bench_payload(doc: Optional[Dict[str, object]]) -> str:

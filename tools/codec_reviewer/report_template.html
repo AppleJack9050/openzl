@@ -263,6 +263,17 @@
   .plot .beat { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 3; stroke-linejoin: round; }
   .plot .best { fill: var(--ink-3); }
   .plot .ttl { fill: var(--ink-2); stroke: var(--raise); stroke-width: 3; paint-order: stroke; stroke-linejoin: round; }
+  .plot .edge-mark { fill: var(--ink); }
+  .plot3d.hinted { position: relative; }
+  /* Redraws replace the chart's children, so pointer and touch events always target the svg itself. */
+  .plot3d svg * { pointer-events: none; }
+  .plot3d svg.panning { cursor: move; }
+  .view-bar .zoom { flex: none; }
+  .zoom span.level { display: inline-grid; place-items: center; height: 28px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+  /* Shown for a moment when a plain scroll starts over the chart; styled like the tooltip. */
+  .zoom-hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 16px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; font: 500 12px/1.3 var(--sans); color: var(--ink); background: var(--raise); border: 1px solid var(--rule-2); border-radius: 7px; padding: 5px 9px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.14); opacity: 0; transition: opacity 150ms; }
+  .zoom-hint.on { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .zoom-hint { transition: none; } }
   .front3 { display: grid; gap: 6px; align-content: start; min-width: 0; }
   .front3 .hint { font-size: 12px; }
   table.f3 { min-width: 0; margin-top: 2px; }
@@ -276,6 +287,7 @@
   }
 
   .serve-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 9px; background: var(--raise); font-size: 14px; color: var(--ink-2); }
+  .serve-bar .dl { margin-left: auto; }
   .btn { font: 500 14px/1 var(--sans); color: var(--ground); background: var(--ink); border: 1px solid var(--ink); border-radius: 7px; padding: 8px 13px; cursor: pointer; }
   .btn:hover { opacity: 0.88; }
   .reviews { position: relative; }
@@ -293,6 +305,7 @@
   .reviews .rres.bad { color: var(--crit); }
   @media (max-width: 640px) {
     .reviews { flex-basis: 100%; }
+    .serve-bar .dl { margin-left: 0; }
     .reviews ol { position: static; width: auto; min-width: 0; max-width: none; margin-top: 6px; box-shadow: none; }
   }
   .serve-status { font-size: 13px; color: var(--ink-3); overflow-wrap: anywhere; min-width: 0; }
@@ -319,6 +332,7 @@
       <ol id="review-list"></ol>
     </details>
     <span class="serve-status" id="serve-status" role="status">or drop traces or .bench.json results anywhere on this page</span>
+    <a class="dl" id="page-download" download hidden title="One HTML file with this review that opens without the server">Download page (HTML)</a>
   </div>
   <header class="top">
     <span class="label" id="kind"></span>
@@ -345,7 +359,7 @@
       <div class="series-legend" id="bench-legend" role="group" aria-label="Series shown in the chart"></div>
       <div class="panels" id="bench-panels">
         <figure class="panel" id="panel-3d">
-          <figcaption><h3>Ratio, compression and decompression speed</h3><span class="hint">3D · MB/s on log scales · drag to turn</span></figcaption>
+          <figcaption><h3>Ratio, compression and decompression speed</h3><span class="hint" id="hint-3d">3D · MB/s on log scales · drag to turn · Ctrl+scroll to zoom</span></figcaption>
           <div class="panel3d">
             <div class="p3-main">
               <div class="view-bar">
@@ -354,8 +368,15 @@
                   <label class="angle" title="0° looks from the front (ratio × decompression), 90° from the high-ratio side">Turn <input type="range" id="turn-3d" min="0" max="90" step="1"> <output id="turn-3d-out" for="turn-3d"></output></label>
                   <label class="angle" title="0° looks level, 90° straight down (ratio × compression)">Tilt <input type="range" id="tilt-3d" min="0" max="90" step="1"> <output id="tilt-3d-out" for="tilt-3d"></output></label>
                 </div>
+                <div class="zoom" id="zoom-3d" role="group" aria-label="Zoom">
+                  <button type="button" id="zoom-out-3d" title="Zoom out (−)" aria-label="Zoom out" disabled>−</button>
+                  <span class="level" id="zoom-level-3d">100%</span>
+                  <button type="button" id="zoom-in-3d" title="Zoom in (+)" aria-label="Zoom in">+</button>
+                  <button type="button" id="zoom-fit-3d" title="Show the whole box again (0)" disabled>Fit</button>
+                </div>
               </div>
               <div class="plot plot3d" id="plot-3d"></div>
+              <p class="hint" id="range-3d" hidden></p>
               <p class="hint" id="note-3d"></p>
             </div>
             <div class="front3" id="front-3d"></div>
@@ -1147,31 +1168,65 @@ function setupBench() {
     return { a, b };
   }
   const Y = { c: yDomain("c"), d: yDomain("d") };
-  function xTicks(count) {
-    const span = X.hi - X.lo;
-    let step = null;
-    outer: for (let e = -3; e <= 6; e++) for (const k of [1, 2, 2.5, 5]) {
+  // A 1, 2, 2.5 or 5 step (times a power of ten) that cuts span into at most count parts.
+  function niceStep(span, count) {
+    for (let e = -9; e <= 9; e++) for (const k of [1, 2, 2.5, 5]) {
       const cand = k * 10 ** e;
-      if (span / cand <= count) { step = cand; break outer; }
+      if (span / cand <= count) return cand;
     }
-    step = step || span;
-    // "4.0×", "4.25×"; whole numbers once the step is 10 or more.
-    const dec = step >= 10 ? 0 : Math.min(3, Math.max(1, (String(+step.toPrecision(6)).split(".")[1] || "").length));
-    const f = fixed(dec);
+    return span;
+  }
+  const decimals = (step) => (String(+step.toPrecision(6)).split(".")[1] || "").length;
+  const multiples = (step, lo, hi) => {
     const out = [];
-    for (let i = Math.ceil(X.lo / step - 1e-9); i * step <= X.hi + 1e-9; i++) {
+    for (let i = Math.ceil(lo / step - 1e-9); i * step <= hi + 1e-9; i++) out.push(+(i * step).toPrecision(12) + 0);
+    return out;
+  };
+  // Ticks from lo to hi: the whole axis, or (zoomed, maxDec 6) the part in view.
+  function xTicks(count, lo = X.lo, hi = X.hi, maxDec = 3) {
+    const step = niceStep(hi - lo, count);
+    // "4.0×", "4.25×"; whole numbers once the step is 10 or more.
+    const f = fixed(step >= 10 ? 0 : Math.min(maxDec, Math.max(1, decimals(step))));
+    const out = [];
+    for (let i = Math.ceil(lo / step - 1e-9); i * step <= hi + 1e-9; i++) {
       const v = i * step + 0; // + 0 turns -0 into 0
       out.push({ v, t: f.format(v) + "×" });
     }
     return out;
   }
-  function yTicks(axis, maxCount) {
-    const { a, b } = Y[axis];
-    let t = T125.filter((v) => v >= a && v <= b);
+  // Zoomed in, finer values per decade: each list holds the one before.
+  const FINER = [[1, 1.5, 2, 3, 5, 7], [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9]];
+  const ladder = (ms, lo, hi) => {
+    const out = [];
+    for (let e = Math.floor(Math.log10(lo)); 10 ** e <= hi; e++) for (const m of ms) {
+      const v = +(m * 10 ** e).toPrecision(3);
+      if (v >= lo && v <= hi) out.push(v);
+    }
+    return out;
+  };
+  // Log-axis ticks at 1, 2 and 5 over [lo, hi], thinned to maxCount. Zoomed (want > 0)
+  // with fewer than want of those: the densest finer list that fits, or evenly spaced
+  // values once the range is under a factor of 2.
+  function yTicks(axis, maxCount, lo = Y[axis].a, hi = Y[axis].b, want = 0) {
+    let t = T125.filter((v) => v >= lo && v <= hi);
+    if (want && t.length < want) {
+      for (const ms of FINER) {
+        const f = ladder(ms, lo, hi);
+        if (f.length > maxCount) break;
+        t = f;
+        if (f.length >= want) break;
+      }
+      if (t.length < want && hi < 2 * lo) {
+        const step = niceStep(hi - lo, Math.max(want, Math.ceil(maxCount / 2))), f = fixed(Math.min(6, decimals(step)));
+        return multiples(step, lo, hi).map((v) => ({ v, t: f.format(v) }));
+      }
+      return t.map((v) => ({ v, t: Number.isInteger(v) ? B(v) : String(v) }));
+    }
     if (t.length > maxCount) t = t.filter((v) => Math.abs(Math.log10(v) - Math.round(Math.log10(v))) < 1e-9);
     while (t.length > maxCount) t = t.filter((_, i) => i % 2 === 0);
     return t.map((v) => ({ v, t: v >= 1 ? B(v) : String(v) }));
   }
+  const wantOf = (len, per, max) => Math.min(max, Math.max(3, Math.round(len / per)));
 
   /* Panels */
   const panels = {};
@@ -1212,7 +1267,17 @@ function setupBench() {
     const panel = panels[axis];
     if (!panel) return;
     const d = panel.drawn.find((q) => q.p === p);
-    if (d) panel.gHl.append(s("circle", { class: cls, cx: d.x, cy: d.y, r: cls === "focus" ? 16 : 8.5 }));
+    if (!d) return;
+    if (panel.shows && !panel.shows(d)) {
+      // Out of view (zoomed in): an arrow at the edge of the view points to it.
+      const R = panel.R, mx = (R.x1 + R.x2) / 2, my = (R.y1 + R.y2) / 2;
+      const vx = d.x - mx, vy = d.y - my, len = Math.hypot(vx, vy) || 1, ux = vx / len, uy = vy / len;
+      const k = Math.min(Math.abs(vx) < 1e-9 ? Infinity : ((R.x2 - R.x1) / 2 - 6) / Math.abs(vx), Math.abs(vy) < 1e-9 ? Infinity : ((R.y2 - R.y1) / 2 - 6) / Math.abs(vy));
+      const tip = { x: mx + k * vx, y: my + k * vy }, bk = { x: tip.x - 10 * ux, y: tip.y - 10 * uy };
+      panel.gHl.append(s("path", { class: "edge-mark", d: `M${f1(tip.x)},${f1(tip.y)}L${f1(bk.x - 5 * uy)},${f1(bk.y + 5 * ux)}L${f1(bk.x + 5 * uy)},${f1(bk.y - 5 * ux)}Z` }));
+      return;
+    }
+    panel.gHl.append(s("circle", { class: cls, cx: d.x, cy: d.y, r: cls === "focus" ? 16 : 8.5 }));
   }
   function clearRings() {
     if (panels.cd) panels.cd.gHl.replaceChildren();
@@ -1264,16 +1329,30 @@ function setupBench() {
   const HALF = [2, 1, 0.75];
   const CORNERS = [];
   for (const a of [-1, 1]) for (const b of [-1, 1]) for (const c of [-1, 1]) CORNERS.push([a, b, c]);
-  const cam = { turn: 35, tilt: 30 };
+  // The camera looks at T, a point of the box (box coordinates), drawn at the centre of
+  // the plot and magnified z times; turning orbits it. T stays in the box shrunk to
+  // 1 - 1/z about its centre, so the middle of the plot always shows the box, and at
+  // zoom 1 T is the centre.
+  const cam = { turn: 35, tilt: 30, z: 1, T: [0, 0, 0] };
+  const ZOOMS = [1, 1.5, 2, 3, 4, 6, 8, 12, 16], ZMAX = 16;
   let svg3 = null, viewBtns = [], frame = 0, anim = null, dragging = false, sliderHeld = false, grab = null;
+  let zooming = false, zoomEnd = 0, pinch = null, pinchLeft = false, gest = null, knowsZoom = false;
+  const touches = new Map(); // touch pointerId -> {x, y} (client px)
   let showAllFront = false, lastFrontKey = null;
-  const moving = () => dragging || sliderHeld || anim != null;
+  const moving = () => dragging || sliderHeld || zooming || anim != null;
+  const zoomed = () => cam.z > 1;
+  const clampZ = (z) => Math.min(ZMAX, Math.max(1, z));
+  const pct = () => `${Math.round(cam.z * 100)}%`;
+  const MAC = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform || navigator.platform || "");
+  const COARSE = matchMedia("(pointer: coarse)").matches;
+  const MOVE_HINT = COARSE ? "Drag with two fingers to move around." : "Shift+drag to move around.";
+  const resetZoom = () => { cam.z = 1; cam.T = [0, 0, 0]; };
   const clampAngle = (v) => Math.min(90, Math.max(0, v));
   const atView = (v) => Math.abs(cam.turn - v.turn) < 0.01 && Math.abs(cam.tilt - v.tilt) < 0.01;
-  const viewSay = (v) => v.say || `View: 3D, turned ${v.turn}°, tilted ${v.tilt}°.`;
+  const viewSay = (v) => (v.say || `View: 3D, turned ${v.turn}°, tilted ${v.tilt}°.`) + keptSay();
   const stepSay = () => {
     const v = VIEWS.find(atView);
-    return v ? viewSay(v) : `Turned ${Math.round(cam.turn)}°, tilted ${Math.round(cam.tilt)}°.`;
+    return v ? viewSay(v) : `Turned ${Math.round(cam.turn)}°, tilted ${Math.round(cam.tilt)}°.` + keptSay();
   };
   const say = (text) => { $("bench-live").textContent = text; };
   const byPointId = (a, b) => (a.p.id < b.p.id ? -1 : a.p.id > b.p.id ? 1 : 0);
@@ -1307,6 +1386,153 @@ function setupBench() {
     return box;
   }
   const TURNED_BOX = screenBox(basis(VIEWS[0].turn, VIEWS[0].tilt));
+  const IDX = { x: 0, c: 1, d: 2 };
+  // Screen right, up and toward the viewer (project() units) back to box coordinates.
+  const unproject = (bas, u, v, d) => [0, 1, 2].map((i) => (bas[0][i] * u + bas[1][i] * v + bas[2][i] * d) / HALF[i]);
+  // Convex hull, counter-clockwise, of [u, v] points.
+  function hull(pts) {
+    const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const chain = (list) => {
+      const out = [];
+      for (const q of list) {
+        while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], q) <= 1e-12) out.pop();
+        out.push(q);
+      }
+      out.pop();
+      return out;
+    };
+    return [...chain(p), ...chain(p.reverse())];
+  }
+  // The point of a convex polygon nearest to q (q itself when inside).
+  function nearestIn(poly, q) {
+    let inside = true, best = q, bd = Infinity;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const ex = b[0] - a[0], ey = b[1] - a[1], len2 = ex * ex + ey * ey;
+      if (ex * (q[1] - a[1]) - ey * (q[0] - a[0]) < -1e-12) inside = false;
+      const f = len2 ? Math.min(1, Math.max(0, ((q[0] - a[0]) * ex + (q[1] - a[1]) * ey) / len2)) : 0;
+      const c = [a[0] + f * ex, a[1] + f * ey], dd = (c[0] - q[0]) ** 2 + (c[1] - q[1]) ** 2;
+      if (dd < bd) { bd = dd; best = c; }
+    }
+    return inside ? q : best;
+  }
+  // The allowed target nearest to `want` as seen: its place on screen if the shrunk box
+  // lies on that line of sight, else the nearest place where it does; along the line of
+  // sight, the depth nearest to want's.
+  function clampTarget(bas, want, z) {
+    const L = 1 - 1 / z;
+    if (L < 1e-9) return [0, 0, 0];
+    const [u0, v0, d0] = project(bas, want);
+    const [u, v] = nearestIn(hull(CORNERS.map((c) => project(bas, c.map((x) => x * L)))), [u0, v0]);
+    let lo = -Infinity, hi = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const w = bas[2][i];
+      if (Math.abs(w) < 1e-9) continue;
+      const c = bas[0][i] * u + bas[1][i] * v;
+      const a = (-L * HALF[i] - c) / w, b = (L * HALF[i] - c) / w;
+      lo = Math.max(lo, Math.min(a, b));
+      hi = Math.min(hi, Math.max(a, b));
+    }
+    const d = lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, d0));
+    return unproject(bas, u, v, d).map((c) => Math.min(L, Math.max(-L, c)) + 0);
+  }
+  // The part of segment a-b inside rect r, as fractions [from, to], or null (Liang-Barsky).
+  function clipSeg(a, b, r) {
+    let f0 = 0, f1 = 1;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    for (const [p, q] of [[-dx, a.x - r.x1], [dx, r.x2 - a.x], [-dy, a.y - r.y1], [dy, r.y2 - a.y]]) {
+      if (Math.abs(p) < 1e-12) { if (q < 0) return null; continue; }
+      const f = q / p;
+      if (p < 0) f0 = Math.max(f0, f); else f1 = Math.min(f1, f);
+      if (f0 > f1) return null;
+    }
+    return [f0, f1];
+  }
+  const clampInto = (r, q) => ({ x: Math.min(r.x2, Math.max(r.x1, q.x)), y: Math.min(r.y2, Math.max(r.y1, q.y)) });
+  // F is how the last drawing mapped the box (panels.cd.F: {bas, cx, cy, kx, ky, R}).
+  // The screen-plane point [u, v] drawn at svg point `at` now.
+  const worldAt = (F, at) => {
+    const [uT, vT] = project(F.bas, cam.T);
+    return [uT + (at.x - F.cx) / (F.kx * cam.z), vT - (at.y - F.cy) / (F.ky * cam.z)];
+  };
+  // Zoom z, and the target that draws screen-plane point w at `at`, at depth d where the
+  // limit allows.
+  function place(F, z, w, at, d) {
+    cam.z = z;
+    cam.T = clampTarget(F.bas, unproject(F.bas, w[0] - (at.x - F.cx) / (F.kx * z), w[1] + (at.y - F.cy) / (F.ky * z), d), z);
+  }
+  // Zoom to z, keeping what is drawn at `at` where it is.
+  function zoomAbout(z, at) {
+    const F = panels.cd.F;
+    place(F, clampZ(z), worldAt(F, at), at, project(F.bas, cam.T)[2]);
+  }
+  // Slide T along the line of sight (the picture stays) to depth d, as far as the limit
+  // allows: turning then pivots at that depth.
+  function settleDepth(d) {
+    const F = panels.cd.F, [u, v] = project(F.bas, cam.T);
+    cam.T = clampTarget(F.bas, unproject(F.bas, u, v, d), cam.z);
+  }
+  // After a zoom or a move: pivot at the depth of the mark in view nearest to `at`.
+  function settleNear(at) {
+    const P = panels.cd;
+    if (!zoomed() || !P) return;
+    let best = null, bd = Infinity;
+    for (const d of P.drawn) {
+      const dd = (d.x - at.x) ** 2 + (d.y - at.y) ** 2;
+      if (P.shows(d) && dd < bd) { bd = dd; best = d; }
+    }
+    if (best) settleDepth(best.depth);
+  }
+  // The range of each box coordinate over the part of the box drawn inside F.R: its
+  // extremes lie on box edges clipped to R or on the lines of sight through R's corners.
+  function visibleRange(F, S) {
+    const R = F.R, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    const add = (n) => n.forEach((v, i) => { lo[i] = Math.min(lo[i], v); hi[i] = Math.max(hi[i], v); });
+    for (const n of CORNERS) for (let i = 0; i < 3; i++) {
+      if (n[i] !== -1) continue;
+      const m = n.slice();
+      m[i] = 1;
+      const f = clipSeg(S(n), S(m), R);
+      if (f) for (const g of f) { const q = n.slice(); q[i] = -1 + 2 * g; add(q); }
+    }
+    const dir = [0, 1, 2].map((i) => F.bas[2][i] / HALF[i]);
+    for (const [x, y] of [[R.x1, R.y1], [R.x2, R.y1], [R.x1, R.y2], [R.x2, R.y2]]) {
+      const [u, v] = worldAt(F, { x, y });
+      const base = unproject(F.bas, u, v, 0);
+      let a = -Infinity, b = Infinity;
+      for (let i = 0; i < 3; i++) {
+        if (Math.abs(dir[i]) < 1e-12) { if (Math.abs(base[i]) > 1 + 1e-9) a = Infinity; continue; }
+        const p = (-1 - base[i]) / dir[i], q = (1 - base[i]) / dir[i];
+        a = Math.max(a, Math.min(p, q));
+        b = Math.min(b, Math.max(p, q));
+      }
+      if (a <= b) for (const at of [a, b]) add(base.map((c, i) => c + at * dir[i]));
+    }
+    return lo[0] <= hi[0] ? lo.map((l, i) => [Math.max(-1, l), Math.min(1, hi[i])]) : [[-1, 1], [-1, 1], [-1, 1]];
+  }
+  // The value at box coordinate n (-1 to 1) on axis a.
+  const dataAt = (a, n) => (a === "x" ? X.lo + ((n + 1) / 2) * (X.hi - X.lo)
+    : 10 ** (Math.log10(Y[a].a) + ((n + 1) / 2) * (Math.log10(Y[a].b) - Math.log10(Y[a].a))));
+  const rangeNum = (v) => (v >= 100 ? B(v) : v >= 1 ? String(+v.toPrecision(3)) : String(+v.toPrecision(2)));
+  // "ratio 2.35× to 5.28×, compression 4.22 to 736 MB/s and decompression 813 to 2,198 MB/s";
+  // a flat view leaves out its hidden axis.
+  function rangeText(P) {
+    if (!P || !P.range) return "";
+    const hide = P.flat ? { top: "d", front: "c", side: "x" }[P.flat.key] : null;
+    const parts = [];
+    if (hide !== "x") {
+      const lo = dataAt("x", P.range[0][0]), hi = dataAt("x", P.range[0][1]);
+      const f = fixed(Math.min(6, Math.max(2, Math.ceil(-Math.log10(hi - lo)) + 1)));
+      parts.push(`ratio ${f.format(lo)}× to ${f.format(hi)}×`);
+    }
+    for (const [a, name] of [["c", "compression"], ["d", "decompression"]]) {
+      if (hide !== a) parts.push(`${name} ${rangeNum(dataAt(a, P.range[IDX[a]][0]))} to ${rangeNum(dataAt(a, P.range[IDX[a]][1]))} MB/s`);
+    }
+    return parts.length === 3 ? `${parts[0]}, ${parts[1]} and ${parts[2]}` : parts.join(" and ");
+  }
+  const zoomSay = () => (zoomed() ? `Zoom ${pct()}${cam.z >= ZMAX ? ", the most" : ""}: ${rangeText(panels.cd)}.` : "Zoom 100%: the whole box.");
+  const keptSay = () => (zoomed() ? ` Zoomed to ${pct()}.` : "");
   // The maximal pairs (a right, b up) as a staircase from the left edge at the
   // highest b down to the bottom edge after the largest a, as a 2D chart draws one.
   function outline(pairs) {
@@ -1325,8 +1551,9 @@ function setupBench() {
   const f1 = (v) => v.toFixed(1);
   const pathOf = (pts, close) => pts.map((q, i) => `${i ? "L" : "M"}${f1(q.x)},${f1(q.y)}`).join("") + (close ? "Z" : "");
   const seg = (a, b, cls) => s("line", { class: cls, x1: f1(a.x), y1: f1(a.y), x2: f1(b.x), y2: f1(b.y) });
+  // The animation's own frames draw while it runs.
   const requestCube = () => {
-    if (!frame) frame = requestAnimationFrame(() => { frame = 0; drawCube(); });
+    if (!frame && !anim) frame = requestAnimationFrame(() => { frame = 0; drawCube(); });
   };
 
   function drawCube() {
@@ -1351,10 +1578,20 @@ function setupBench() {
     const kx = k + (pw / box.bw - k) * t, ky = k + (ph / box.bh - k) * t;
     const cx = M.l + pw / 2 - (kx * (box.minx + box.maxx)) / 2;
     const cy = M.t + ph / 2 + (ky * (box.miny + box.maxy)) / 2;
+    const z = cam.z, zoom = zoomed();
+    const [uT, vT] = project(bas, cam.T);
     const S = (n) => {
       const [sx, sy, depth] = project(bas, n);
-      return { x: cx + kx * sx, y: cy - ky * sy, depth };
+      return { x: cx + kx * z * (sx - uT), y: cy - ky * z * (sy - vT), depth };
     };
+    // The plot: a flat view's frame, widening to the whole picture less a 2 px rim as the
+    // view turns. Zoomed in, everything is clipped to it.
+    const R = { x1: 2 + (M.l - 2) * t, y1: 2 + (M.t - 2) * t, x2: W - 2 - (M.r - 2) * t, y2: H - 2 - (M.b - 2) * t };
+    const F = { bas, cx, cy, kx, ky, R };
+    const inRect = (q, pad = 0) => q.x >= R.x1 - pad && q.x <= R.x2 + pad && q.y >= R.y1 - pad && q.y <= R.y2 + pad;
+    const shows = zoom ? (q) => inRect(q) : () => true;
+    const range = zoom ? visibleRange(F, S) : null;
+    const inView = (a) => [dataAt(a, range[IDX[a]][0]), dataAt(a, range[IDX[a]][1])];
     const key = subsetKey(shownIds());
     const front = frontOf("cd", key);
     const onFront = new Set(front);
@@ -1362,9 +1599,19 @@ function setupBench() {
     svg3.setAttribute("width", W);
     svg3.setAttribute("height", H);
     svg3.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    const [gWalls, gGrid, gShade, gAxes, gStems, gPaths, gMarks, gRings, gLabels, gHl] = Array.from({ length: 10 }, () => s("g"));
-    svg3.replaceChildren(gWalls, gGrid, gShade, gAxes, gStems, gPaths, gMarks, gRings, gLabels, gHl);
-    const text = (x, y, anchor, str, cls) => gAxes.append(s("text", { ...(cls ? { class: cls } : {}), x: f1(x), y: f1(y), "text-anchor": anchor }, str));
+    const layers = Array.from({ length: 10 }, () => s("g"));
+    const [gWalls, gGrid, gShade, gAxes, gStems, gPaths, gMarks, gRings, gLabels, gHl] = layers;
+    // Zoomed in, the drawing is clipped to the plot; axis text is not.
+    const gText = zoom ? s("g") : gAxes;
+    if (zoom) {
+      for (const g of layers) g.setAttribute("clip-path", "url(#clip-3d)");
+      const clip = s("clipPath", { id: "clip-3d" });
+      clip.append(s("rect", { x: f1(R.x1), y: f1(R.y1), width: f1(R.x2 - R.x1), height: f1(R.y2 - R.y1), rx: f1(6 * (1 - t)) }));
+      const defs = s("defs");
+      defs.append(clip);
+      svg3.replaceChildren(gWalls, gGrid, gShade, gAxes, gText, gStems, gPaths, gMarks, gRings, gLabels, gHl, defs);
+    } else svg3.replaceChildren(...layers);
+    const text = (x, y, anchor, str, cls) => gText.append(s("text", { ...(cls ? { class: cls } : {}), x: f1(x), y: f1(y), "text-anchor": anchor }, str));
     const textBox = (x, y, anchor, str) => {
       const w = str.length * 6.7;
       const x1 = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
@@ -1392,28 +1639,68 @@ function setupBench() {
     const uncShown = (p) => (flat && flat.key === "top" ? uncertain(p, "c") : flat && flat.key === "front" ? uncertain(p, "d") : uncertain(p, "c") || uncertain(p, "d"));
 
     // Tick values: a flat view counts them like a 2D chart, a turned view by the
-    // length of each axis on screen.
+    // length of each axis on screen. Zoomed in, only the part in view counts.
     const ticks = {};
     const axes = {};
+    const cands = {};
+    let xc = 1;
     const nOf = (a, v) => (a === "x" ? nx(v) : nl(a, v));
-    const hTicks = (len) => xTicks(Math.max(2, Math.min(narrow ? 5 : 10, Math.floor(len / (narrow ? 64 : 80)))));
-    if (flat) {
+    const hCount = (len) => Math.max(2, Math.min(narrow ? 5 : 10, Math.floor(len / (narrow ? 64 : 80))));
+    const hTicks = (len) => xTicks(hCount(len));
+    const edge = (A, Bn, at) => {
+      const a = S(A), b = S(Bn), len = Math.hypot(b.x - a.x, b.y - a.y);
+      return { at, a, b, len, dir: len ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : { x: 0, y: 0 } };
+    };
+    if (flat && !zoom) {
       if (flat.key === "side") ticks.c = yTicks("c", Math.max(2, Math.floor(pw / 56)));
       else ticks.x = hTicks(pw);
       const vert = flat.key === "top" ? "c" : "d";
       ticks[vert] = yTicks(vert, Math.max(3, Math.floor(ph / 26)));
+    } else if (flat) {
+      const horiz = flat.key === "side" ? "c" : "x", vert = flat.key === "top" ? "c" : "d";
+      const hMax = Math.max(2, Math.floor(pw / 56)), vMax = Math.max(3, Math.floor(ph / 26));
+      if (horiz === "x") ticks.x = xTicks(hCount(pw), ...inView("x"), 6);
+      else ticks.c = yTicks("c", hMax, ...inView("c"), wantOf(pw, 150, hMax));
+      ticks[vert] = yTicks(vert, vMax, ...inView(vert), wantOf(ph, 70, vMax));
+      // Keep the ticks whose labels have room.
+      const pos = (a, v) => { const n = nOf(a, v); return S(a === "x" ? [n, -1, -1] : a === "c" ? [-1, n, -1] : [-1, 1, n]); };
+      let lastX = -Infinity, lastW = 0, lastY = Infinity;
+      ticks[horiz] = ticks[horiz].filter((tk) => {
+        const x = pos(horiz, tk.v).x, wd = tk.t.length * 6.7;
+        if (x < R.x1 - 0.5 || x > R.x2 + 0.5 || x - wd / 2 < R.x1 - 6 || x + wd / 2 > W - 2 || x - lastX < (wd + lastW) / 2 + 10) return false;
+        lastX = x;
+        lastW = wd;
+        return true;
+      });
+      ticks[vert] = ticks[vert].filter((tk) => {
+        const y = pos(vert, tk.v).y;
+        if (y < R.y1 - 0.5 || y > R.y2 + 0.5 || lastY - y < 16) return false;
+        lastY = y;
+        return true;
+      });
     } else {
-      const edge = (A, Bn, at) => {
-        const a = S(A), b = S(Bn), len = Math.hypot(b.x - a.x, b.y - a.y);
-        return { at, a, b, len, dir: len ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : { x: 0, y: 0 } };
-      };
       axes.d = edge([-1, -1, -1], [-1, -1, 1], (n) => [-1, -1, n]);
       // Compression runs along the front edge while decompression shows, else along the left.
-      const xc = axes.d.len >= 36 ? 1 : -1;
+      xc = axes.d.len / z >= 36 ? 1 : -1;
       axes.c = edge([xc, -1, -1], [xc, 1, -1], (n) => [xc, n, -1]);
       axes.x = edge([-1, -1, -1], [1, -1, -1], (n) => [n, -1, -1]);
-      ticks.x = hTicks(axes.x.len);
-      for (const a of ["c", "d"]) ticks[a] = yTicks(a, Math.max(2, Math.floor(axes[a].len / (26 + 30 * Math.abs(axes[a].dir.x)))));
+      if (!zoom) {
+        ticks.x = hTicks(axes.x.len);
+        for (const a of ["c", "d"]) ticks[a] = yTicks(a, Math.max(2, Math.floor(axes[a].len / (26 + 30 * Math.abs(axes[a].dir.x)))));
+      } else {
+        // The four parallel edges of an axis have the same length on screen, so one list serves them all.
+        const shown = (a) => (range[IDX[a]][1] - range[IDX[a]][0]) / 2;
+        ticks.x = xTicks(Math.max(2, Math.floor((axes.x.len * shown("x")) / (narrow ? 64 : 80))), ...inView("x"), 6);
+        for (const a of ["c", "d"]) {
+          const len = axes[a].len * shown(a), across = Math.abs(axes[a].dir.x);
+          const max = Math.max(2, Math.floor(len / (26 + 30 * across)));
+          ticks[a] = yTicks(a, max, ...inView(a), wantOf(len, 70 + 80 * across, max));
+        }
+        // An axis may be labelled on whichever of its edges is in view, the usual one first.
+        cands.x = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([b, c]) => edge([-1, b, c], [1, b, c], (n) => [n, b, c]));
+        cands.c = [[xc, -1], [-xc, -1], [xc, 1], [-xc, 1]].map(([a, c]) => edge([a, -1, c], [a, 1, c], (n) => [a, n, c]));
+        cands.d = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => edge([a, b, -1], [a, b, 1], (n) => [a, b, n]));
+      }
     }
 
     // Walls behind the points that face the viewer, with their grids and shadows:
@@ -1434,7 +1721,9 @@ function setupBench() {
       wl.axes.forEach((a, i) => {
         for (const tk of ticks[a] || []) {
           const n = nOf(a, tk.v);
-          gGrid.append(gridLine(S(wl.lift(i ? [-1, n] : [n, -1])), S(wl.lift(i ? [1, n] : [n, 1]))));
+          const p = S(wl.lift(i ? [-1, n] : [n, -1])), q = S(wl.lift(i ? [1, n] : [n, 1]));
+          if (zoom && (Math.max(p.x, q.x) < R.x1 || Math.min(p.x, q.x) > R.x2 || Math.max(p.y, q.y) < R.y1 || Math.min(p.y, q.y) > R.y2)) continue;
+          gGrid.append(gridLine(p, q));
         }
       });
       const o = outline(frontOf(wl.shadow, key).filter((id) => drawnById.has(id)).map((id) => wl.pair(drawnById.get(id).n)));
@@ -1452,7 +1741,9 @@ function setupBench() {
     const taken = [];
     if (flat) {
       const base = { top: [[-1, -1, -1], [1, -1, -1]], front: [[-1, 1, -1], [1, 1, -1]], side: [[-1, -1, -1], [-1, 1, -1]] }[flat.key];
-      gAxes.append(gridLine(S(base[0]), S(base[1])));
+      // Zoomed in, the box's bottom edge may be out of view; the plot's is not.
+      if (zoom) gText.append(gridLine({ x: M.l, y: M.t + ph }, { x: M.l + pw, y: M.t + ph }));
+      else gAxes.append(gridLine(S(base[0]), S(base[1])));
       const horiz = flat.key === "side" ? "c" : "x";
       const vert = flat.key === "top" ? "c" : "d";
       for (const tk of ticks[horiz]) {
@@ -1476,39 +1767,65 @@ function setupBench() {
           gAxes.append(seg(S(n), S(m), back ? "bx" : "bx front"));
         }
       }
-      const center = S([0, 0, 0]);
+      const center = S(cam.T);
       const kept = { x: [], c: [], d: [] };
-      for (const a of ["x", "c", "d"]) {
-        const ax = axes[a];
-        if (ax.len < 36) continue;
-        ax.mid = S(ax.at(0));
-        let o = { x: -ax.dir.y, y: ax.dir.x };
-        if (o.x * (ax.mid.x - center.x) + o.y * (ax.mid.y - center.y) < 0) o = { x: -o.x, y: -o.y };
+      // An axis edge's labels, on the part of it in view: null when too little shows.
+      const layout = (a, ax) => {
+        let part;
+        if (zoom) {
+          const f = clipSeg(ax.a, ax.b, R);
+          if (!f || (f[1] - f[0]) * ax.len < 36) return null;
+          const pt = (g) => ({ x: ax.a.x + g * (ax.b.x - ax.a.x), y: ax.a.y + g * (ax.b.y - ax.a.y) });
+          const pa = pt(f[0]), pb = pt(f[1]);
+          part = { ...ax, a: pa, b: pb, len: (f[1] - f[0]) * ax.len, mid: { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 } };
+        } else {
+          if (ax.len < 36) return null;
+          part = { ...ax, mid: S(ax.at(0)) };
+        }
+        let o = { x: -part.dir.y, y: part.dir.x };
+        if (o.x * (part.mid.x - center.x) + o.y * (part.mid.y - center.y) < 0) o = { x: -o.x, y: -o.y };
         const anchor = Math.abs(o.x) > 0.45 ? (o.x > 0 ? "start" : "end") : "middle";
         const shift = anchor === "middle" ? (o.y > 0 ? 8 : -1) : 4;
-        Object.assign(ax, { o, anchor, shift });
+        const marks = [];
         let last = -Infinity;
         for (const tk of ticks[a]) {
-          const q = S(ax.at(nOf(a, tk.v)));
-          const along = (q.x - ax.a.x) * ax.dir.x + (q.y - ax.a.y) * ax.dir.y;
+          const q = S(part.at(nOf(a, tk.v)));
+          if (zoom && !inRect(q, 0.5)) continue;
+          const along = (q.x - part.a.x) * part.dir.x + (q.y - part.a.y) * part.dir.y;
           if (along - last < (anchor === "middle" ? 44 : 22)) continue;
+          const lx = q.x + 8 * o.x, ly = q.y + 8 * o.y + shift, bx = textBox(lx, ly, anchor, tk.t);
+          if (zoom && (bx.x1 < 2 || bx.x2 > W - 2 || bx.y1 < 2 || bx.y2 > H - 2 || hits(bx, taken))) continue;
           last = along;
-          kept[a].push(q);
-          gAxes.append(seg(q, { x: q.x + 4 * o.x, y: q.y + 4 * o.y }, "tick"));
-          const lx = q.x + 8 * o.x, ly = q.y + 8 * o.y + shift;
-          text(lx, ly, anchor, tk.t);
-          taken.push(textBox(lx, ly, anchor, tk.t));
+          marks.push({ q, lx, ly, t: tk.t, bx });
+        }
+        return { ...part, o, anchor, shift, marks };
+      };
+      for (const a of ["x", "c", "d"]) {
+        let best = null;
+        for (const ax of zoom ? cands[a] : [axes[a]]) {
+          const l = layout(a, ax);
+          if (l && (!best || l.marks.length > best.marks.length)) best = l;
+          if (best && best.marks.length >= 2) break;
+        }
+        axes[a] = best && (!zoom || best.marks.length) ? best : null;
+        if (!axes[a]) continue;
+        const { o, anchor } = axes[a];
+        for (const m of axes[a].marks) {
+          kept[a].push(m.q);
+          gAxes.append(seg(m.q, { x: m.q.x + 4 * o.x, y: m.q.y + 4 * o.y }, "tick"));
+          text(m.lx, m.ly, anchor, m.t);
+          taken.push(m.bx);
         }
       }
       // Titles keep clear of every mark if they can, else of the frontier marks
       // and the traced ring only (they have a halo), before they are left out.
-      const ringBox = tracedD ? [markBox(tracedD, 13)] : [];
-      const avoidAll = [...drawn.map((d) => markBox(d, 6)), ...ringBox];
-      const avoidFront = [...drawn.filter((d) => d.on).map((d) => markBox(d, 6)), ...ringBox];
+      const ringBox = tracedD && shows(tracedD) ? [markBox(tracedD, 13)] : [];
+      const avoidAll = [...drawn.filter(shows).map((d) => markBox(d, 6)), ...ringBox];
+      const avoidFront = [...drawn.filter((d) => d.on && shows(d)).map((d) => markBox(d, 6)), ...ringBox];
       const titles = { d: narrow ? "decomp. MB/s" : "decompression MB/s", c: narrow ? "comp. MB/s" : "compression MB/s", x: "ratio" };
       for (const a of ["d", "c", "x"]) {
         const ax = axes[a];
-        if (ax.len < 36) continue;
+        if (!ax) continue;
         const { o, anchor, shift } = ax;
         const spots = [];
         if (a !== "x") {
@@ -1538,11 +1855,11 @@ function setupBench() {
       }
       // Where all three are best.
       const best = S([1, 1, 1]);
-      gAxes.append(s("circle", { class: "best", cx: f1(best.x), cy: f1(best.y), r: 2.5 }));
+      if (!zoom || inRect(best)) gAxes.append(s("circle", { class: "best", cx: f1(best.x), cy: f1(best.y), r: 2.5 }));
       let bx = textBox(best.x + 6, best.y - 6, "start", "best");
       const bestAt = bx.x2 > W - 2 ? [best.x - 6, "end"] : [best.x + 6, "start"];
       bx = textBox(bestAt[0], best.y - 6, bestAt[1], "best");
-      if (bx.y1 >= 2 && bx.x1 >= 2) {
+      if (bx.y1 >= 2 && bx.x1 >= 2 && (!zoom || (inRect(best) && !hits(bx, taken)))) {
         text(bestAt[0], best.y - 6, bestAt[1], "best", "note");
         taken.push(bx);
       }
@@ -1551,6 +1868,7 @@ function setupBench() {
     // Stems drop each mark to the floor, frontier stems on top.
     if (!flat && cam.tilt >= 6) {
       for (const d of [...drawn].sort((a, b) => a.on - b.on)) {
+        if (zoom && (Math.max(d.x, d.foot.x) < R.x1 || Math.min(d.x, d.foot.x) > R.x2 || Math.max(d.y, d.foot.y) < R.y1 || Math.min(d.y, d.foot.y) > R.y2)) continue;
         const g = s("g", { class: color(d.ser) });
         g.append(seg(d, d.foot, d.on ? "stem on" : "stem"), s("circle", { class: d.on ? "foot on" : "foot", cx: f1(d.foot.x), cy: f1(d.foot.y), r: 1.8 }));
         gStems.append(g);
@@ -1568,6 +1886,7 @@ function setupBench() {
       ? (a, b) => a.on - b.on || a.depth - b.depth || byPointId(a, b)
       : (a, b) => a.depth - b.depth || a.on - b.on || byPointId(a, b));
     for (const d of order) {
+      if (zoom && !inRect(d, 16)) continue;
       const g = s("g", { class: color(d.ser) });
       const x = Math.round(d.x * 10) / 10, y = Math.round(d.y * 10) / 10;
       if (!d.on) g.append(shapeEl(shape(d.ser), x, y, "m-halo"));
@@ -1580,20 +1899,21 @@ function setupBench() {
     }
     // Labels only at rest: the traced run, then the frontier from the best ratio down.
     if (!moving()) {
-      const inside = flat
-        ? (b) => b.x1 >= M.l + 1 && b.x2 <= M.l + pw - 1 && b.y1 >= M.t + 1 && b.y2 <= M.t + ph - 1
+      const inside = flat || zoom
+        ? (b) => b.x1 >= R.x1 + 1 && b.x2 <= R.x2 - 1 && b.y1 >= R.y1 + 1 && b.y2 <= R.y2 - 1
         : (b) => b.x1 >= 2 && b.x2 <= W - 2 && b.y1 >= 2 && b.y2 <= H - 2;
-      const place = makePlacer({ drawn, tracedD, boxes: [...taken], inside, layer: gLabels });
-      if (tracedD) place(tracedD, "traced", "strong", 15);
-      for (const d of drawn.filter((q) => q.on).sort((a, b) => a.p.bytes - b.p.bytes || byPointId(a, b))) {
-        place(d, shortLevel(d.p), "", d === tracedD ? 15 : uncShown(d.p) ? 11 : 8);
+      const tracedShown = tracedD && shows(tracedD) ? tracedD : undefined;
+      const labelAt = makePlacer({ drawn: drawn.filter(shows), tracedD: tracedShown, boxes: [...taken], inside, layer: gLabels });
+      if (tracedShown) labelAt(tracedShown, "traced", "strong", 15);
+      for (const d of drawn.filter((q) => q.on && shows(q)).sort((a, b) => a.p.bytes - b.p.bytes || byPointId(a, b))) {
+        labelAt(d, shortLevel(d.p), "", d === tracedD ? 15 : uncShown(d.p) ? 11 : 8);
       }
     }
 
     // Keyboard order follows the picture: left to right, and bottom to top.
     const byRatio = [...drawn].sort((a, b) => a.x - b.x || b.y - a.y || a.depth - b.depth || byPointId(a, b));
     const bySpeed = [...drawn].sort((a, b) => b.y - a.y || a.x - b.x || a.depth - b.depth || byPointId(a, b));
-    panels.cd = { svg: svg3, drawn, order, byRatio, bySpeed, gHl, W, H, key, onFront, S, t, flat, walls };
+    panels.cd = { svg: svg3, drawn, order, byRatio, bySpeed, gHl, W, H, key, onFront, S, t, flat, walls, F, R, shows, range, z };
     if (focusId.cd && !drawnById.has(focusId.cd)) focusId.cd = null;
 
     for (const [id, prop] of [["turn-3d", "turn"], ["tilt-3d", "tilt"]]) {
@@ -1603,11 +1923,15 @@ function setupBench() {
       $(id + "-out").textContent = `${deg}°`;
     }
     VIEWS.forEach((v, i) => viewBtns[i].setAttribute("aria-pressed", String(atView(v))));
+    zoomControls();
+    const rl = $("range-3d");
+    rl.hidden = !zoom;
+    rl.textContent = zoom ? `Zoomed to ${pct()}: ${rangeText(panels.cd)}. ${MOVE_HINT}` : "";
 
     const fpts = front.map((id) => pById.get(id)).filter(Boolean);
     const list = fpts.slice(0, 8).map((p) => `${pointName(p)} (${ratioText(p)}, ${speedText(p.c_speed)} and ${speedText(p.d_speed)} MB/s)`).join("; ");
     const phrase = flat ? flat.phrase : `turned ${Math.round(cam.turn)}°, tilted ${Math.round(cam.tilt)}°`;
-    svg3.setAttribute("aria-label", `Ratio, compression and decompression speed, ${phrase}: ${plural(drawn.length, "point")}. ${B(fpts.length)} on the three-way frontier: ${list}${fpts.length > 8 ? `; and ${B(fpts.length - 8)} more` : ""}. Arrow keys move through the points as drawn; Shift with the arrow keys turns and tilts; 1 to 4 pick a view.`);
+    svg3.setAttribute("aria-label", `Ratio, compression and decompression speed, ${phrase}: ${plural(drawn.length, "point")}. ${B(fpts.length)} on the three-way frontier: ${list}${fpts.length > 8 ? `; and ${B(fpts.length - 8)} more` : ""}.${zoom ? ` Zoomed to ${pct()}: ${rangeText(panels.cd)}.` : ""} Arrow keys move through the points as drawn; Shift with the arrow keys turns and tilts; 1 to 4 pick a view; + and − zoom, and 0 shows the whole box.`);
     $("note-3d").textContent = note3(flat, key, fpts);
 
     if (document.activeElement === svg3 && focusId.cd) {
@@ -1708,20 +2032,113 @@ function setupBench() {
     if (anim) cancelAnimationFrame(anim.id);
     anim = null;
   }
-  // Show the focused point again after the view changed under it.
-  function refocus3() {
-    const P = panels.cd;
-    const d = P && document.activeElement === svg3 && focusId.cd && P.drawn.find((q) => q.p.id === focusId.cd);
-    if (d) showPoint(d.p, anchorAt(P, d));
+  function zoomControls() {
+    $("zoom-level-3d").textContent = pct();
+    // A button that goes disabled while focused hands focus to one that still works.
+    const low = cam.z <= 1 + 1e-6, high = cam.z >= ZMAX - 1e-6;
+    const rules = [["zoom-out-3d", low, "zoom-in-3d"], ["zoom-fit-3d", low, "zoom-in-3d"], ["zoom-in-3d", high, "zoom-out-3d"]];
+    const had = rules.find(([id]) => document.activeElement === $(id));
+    for (const [id, off] of rules) $(id).disabled = off;
+    if (had && had[1]) $(had[2]).focus({ preventScroll: true });
   }
-  function animateTo(v) {
+  // Keyboard only: pan the least that puts drawn point d m px inside R, pivoting at d.
+  function reveal(d) {
+    const F = panels.cd.F, R = F.R;
+    if (!zoomed()) return false;
+    const m = Math.min(24, (R.x2 - R.x1) / 4, (R.y2 - R.y1) / 4);
+    const x = Math.min(R.x2 - m, Math.max(R.x1 + m, d.x)), y = Math.min(R.y2 - m, Math.max(R.y1 + m, d.y));
+    if (x === d.x && y === d.y) return false;
+    const [u, v] = project(F.bas, d.n);
+    place(F, cam.z, [u, v], { x, y }, d.depth);
+    // The limit can hold a turned view short: then draw d where it sits at 1×, inside R.
+    const [uT, vT] = project(F.bas, cam.T);
+    const qx = F.cx + F.kx * cam.z * (u - uT), qy = F.cy - F.ky * cam.z * (v - vT);
+    if (qx < R.x1 || qx > R.x2 || qy < R.y1 || qy > R.y2) { cam.T = d.n.map((c) => c * (1 - 1 / cam.z)); settleDepth(d.depth); }
+    return true;
+  }
+  // Show the focused point again after the view changed under it; after a key, bring it
+  // into view first.
+  function refocus3(byKey = false) {
+    let P = panels.cd;
+    let d = P && document.activeElement === svg3 && focusId.cd && P.drawn.find((q) => q.p.id === focusId.cd);
+    if (!d) return;
+    if (byKey && reveal(d)) { drawCube(); P = panels.cd; d = P.drawn.find((q) => q.p.id === focusId.cd); }
+    if (!P.shows(d)) { hideTip(); clearRings(); return; }
+    showPoint(d.p, anchorAt(P, d));
+  }
+  // Zoom one stop in (dir 1) or out (-1): about the focused point after a key, else
+  // about the middle of the plot.
+  function stepZoom(dir, byKey) {
+    const P = panels.cd;
+    if (!P) return;
+    knowsZoom = true;
+    hideHint();
+    const z1 = dir > 0 ? ZOOMS.find((v) => v > cam.z * 1.001) ?? ZMAX : [...ZOOMS].reverse().find((v) => v < cam.z / 1.001) ?? 1;
+    if (z1 === cam.z) { say(zoomSay()); return; }
+    let d = byKey && focusId.cd ? P.drawn.find((q) => q.p.id === focusId.cd) : null;
+    if (d && reveal(d)) { drawCube(); d = panels.cd.drawn.find((q) => q.p.id === focusId.cd); }
+    const at = d ? { x: d.x, y: d.y } : { x: P.F.cx, y: P.F.cy };
+    zoomAbout(z1, at);
+    hideTip();
+    drawCube();
+    if (d) settleDepth(d.depth);
+    else settleNear(at);
+    if (byKey) refocus3(true);
+    say(zoomSay());
+  }
+  function fitZoom(byKey) {
+    knowsZoom = true;
+    hideHint();
+    resetZoom();
+    drawCube();
+    if (byKey) refocus3(true);
+    say(zoomSay());
+  }
+  // Continuous zooms (wheel, pinch, gesture) draw without labels until they end.
+  function beginZoom() {
+    knowsZoom = true;
+    hideHint();
+    if (!zooming) { zooming = true; hoverId = null; hideTip(); clearRings(); }
+  }
+  function endZoom(at) {
+    clearTimeout(zoomEnd);
+    zooming = false;
+    // Snap only at the end: a per-event snap would trap slow pinches at 100%.
+    if (cam.z < 1.02) resetZoom();
+    drawCube();
+    if (at) settleNear(at);
+    refocus3();
+    say(zoomSay());
+  }
+  // The wheel hint, made on first use so the page at rest is untouched.
+  let hintEl = null, hintTimer = 0, hintShows = 0;
+  function showHint() {
+    if (!hintEl) {
+      hintEl = h("div", { class: "zoom-hint", "aria-hidden": "true", text: `Hold ${MAC ? "⌘" : "Ctrl"} and scroll to zoom` });
+      $("plot-3d").classList.add("hinted");
+      $("plot-3d").append(hintEl);
+      void hintEl.offsetWidth; // fade in from opacity 0
+    }
+    if (!hintEl.classList.contains("on")) {
+      if (hintShows >= 3) return;
+      hintShows++;
+      hintEl.classList.add("on");
+    }
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(hideHint, 1500);
+  }
+  function hideHint() {
+    clearTimeout(hintTimer);
+    if (hintEl) hintEl.classList.remove("on");
+  }
+  function animateTo(v, byKey = false) {
     cancelAnim();
     const done = () => {
       cam.turn = v.turn;
       cam.tilt = v.tilt;
       anim = null;
       drawCube();
-      refocus3();
+      refocus3(byKey);
     };
     if (reduceMotion()) { done(); return; }
     const from = { turn: cam.turn, tilt: cam.tilt }, t0 = performance.now();
@@ -1799,6 +2216,7 @@ function setupBench() {
     // capture survive them.
     svg3 = s("svg", { tabindex: "0", role: "img", "aria-describedby": "note-3d" });
     $("plot-3d").replaceChildren(svg3);
+    $("hint-3d").textContent = `3D · MB/s on log scales · drag to turn · ${COARSE ? "pinch" : MAC ? "⌘+scroll" : "Ctrl+scroll"} to zoom`;
 
     const svgPoint = (e) => {
       const r = svg3.getBoundingClientRect();
@@ -1812,6 +2230,7 @@ function setupBench() {
       const at = svgPoint(e);
       let close = null, best = null, bd = 24 * 24;
       for (const d of P.order) {
+        if (!P.shows(d)) continue;
         const dd = (d.x - at.x) ** 2 + (d.y - at.y) ** 2;
         if (dd <= 49) close = d;
         if (dd <= bd) { bd = dd; best = d; }
@@ -1824,11 +2243,54 @@ function setupBench() {
       hideTip();
       clearRings();
     };
+    // Two fingers pinch (and move); a turn the first finger began is undone.
+    const startPinch = () => {
+      if (dragging && grab && !grab.pan) {
+        cam.turn = grab.turn;
+        cam.tilt = grab.tilt;
+        svg3.classList.remove("turning");
+        drawCube();
+      }
+      dragging = false;
+      grab = null;
+      gest = null;
+      cancelAnim();
+      const ids = [...touches.keys()].slice(0, 2);
+      for (const id of ids) {
+        try { svg3.setPointerCapture(id); } catch (err) { /* the pointer is already gone */ }
+      }
+      const [a, b] = ids.map((id) => touches.get(id));
+      const F = panels.cd.F, k = panels.cd.W / svg3.getBoundingClientRect().width;
+      const at = clampInto(F.R, svgPoint({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }));
+      pinch = { ids, z0: cam.z, w: worldAt(F, at), d0: Math.max(24, Math.hypot(a.x - b.x, a.y - b.y) * k), depth: project(F.bas, cam.T)[2], last: at };
+      beginZoom();
+    };
     svg3.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "touch") {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size === 2 && !pinch && !pinchLeft && panels.cd) { startPinch(); return; }
+        if (touches.size > 1 || pinchLeft) return;
+      }
       if (e.button !== 0) return;
-      grab = { x: e.clientX, y: e.clientY, turn: cam.turn, tilt: cam.tilt, pointerId: e.pointerId };
+      // Shift+drag moves a zoomed view; a plain drag (or Shift+drag at 100%) turns.
+      const pan = e.shiftKey && zoomed() && e.pointerType !== "touch";
+      if (pan) e.preventDefault(); // no focus (Shift would make it look like keyboard focus), no selection
+      grab = { x: e.clientX, y: e.clientY, turn: cam.turn, tilt: cam.tilt, pointerId: e.pointerId, pan };
     });
     svg3.addEventListener("pointermove", (e) => {
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch) {
+        if (!pinch.ids.includes(e.pointerId)) return;
+        const [a, b] = pinch.ids.map((id) => touches.get(id));
+        const F = panels.cd.F, k = panels.cd.W / svg3.getBoundingClientRect().width;
+        const mid = clampInto(F.R, svgPoint({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }));
+        place(F, clampZ((pinch.z0 * Math.max(24, Math.hypot(a.x - b.x, a.y - b.y) * k)) / pinch.d0), pinch.w, mid, pinch.depth);
+        pinch.last = mid;
+        requestCube();
+        return;
+      }
+      // A finger left over from a pinch does nothing until all lift.
+      if (pinchLeft && e.pointerType === "touch") return;
       if (grab && e.pointerId === grab.pointerId && !dragging && Math.hypot(e.clientX - grab.x, e.clientY - grab.y) >= 4) {
         dragging = true;
         try { svg3.setPointerCapture(e.pointerId); } catch (err) { /* the pointer is already gone */ }
@@ -1836,26 +2298,66 @@ function setupBench() {
         hoverId = null;
         hideTip();
         clearRings();
-        svg3.classList.add("turning");
+        svg3.classList.add(grab.pan ? "panning" : "turning");
         svg3.style.cursor = "";
+        if (grab.pan) {
+          const F = panels.cd.F;
+          grab.a0 = svgPoint({ clientX: grab.x, clientY: grab.y });
+          grab.w = worldAt(F, grab.a0);
+          grab.depth = project(F.bas, cam.T)[2];
+        }
       }
       if (dragging) {
         if (e.pointerId !== grab.pointerId) return;
+        if (grab.pan) {
+          // From the grab's start, so the limit acts as a wall with no drift.
+          const k = panels.cd.W / svg3.getBoundingClientRect().width;
+          place(panels.cd.F, cam.z, grab.w, { x: grab.a0.x + (e.clientX - grab.x) * k, y: grab.a0.y + (e.clientY - grab.y) * k }, grab.depth);
+          requestCube();
+          return;
+        }
         // Left shows more of the high-ratio side; down looks from higher up.
         cam.turn = clampAngle(Math.round(grab.turn - 0.4 * (e.clientX - grab.x)));
         cam.tilt = clampAngle(Math.round(grab.tilt + 0.4 * (e.clientY - grab.y)));
         requestCube();
         return;
       }
+      if (e.pointerType === "touch" && touches.size > 1) return;
       const d = pick(e);
-      svg3.style.cursor = d && d.p.id === traced && explorerShown() ? "pointer" : "";
+      svg3.style.cursor = e.shiftKey && zoomed() ? "move" : d && d.p.id === traced && explorerShown() ? "pointer" : "";
       if (!d) { unhover(); return; }
       hoverId = d.p.id;
       showPoint(d.p, { currentTarget: svg3, clientX: e.clientX, clientY: e.clientY });
     });
-    svg3.addEventListener("pointerleave", () => { if (!dragging) unhover(); });
+    let over = false;
+    svg3.addEventListener("pointerenter", () => { over = true; });
+    svg3.addEventListener("pointerleave", () => {
+      over = false;
+      hideHint();
+      if (!dragging) unhover();
+    });
+    // Keep the page from scrolling under a pinch; one finger still scrolls or turns.
+    svg3.addEventListener("touchmove", (e) => { if (pinch && e.cancelable) e.preventDefault(); }, { passive: false });
     const release = (e, click) => {
+      if (touches.delete(e.pointerId)) {
+        if (pinch && pinch.ids.includes(e.pointerId)) {
+          const at = pinch.last;
+          pinch = null;
+          pinchLeft = touches.size > 0;
+          endZoom(at);
+        }
+        if (!touches.size) pinchLeft = false;
+      }
       if (!grab || e.pointerId !== grab.pointerId) return;
+      if (dragging && grab.pan) {
+        dragging = false;
+        svg3.classList.remove("panning");
+        grab = null;
+        drawCube();
+        settleNear({ x: panels.cd.F.cx, y: panels.cd.F.cy });
+        say(`Moved: ${rangeText(panels.cd)}.`);
+        return;
+      }
       if (dragging) {
         dragging = false;
         svg3.classList.remove("turning");
@@ -1875,6 +2377,81 @@ function setupBench() {
     };
     svg3.addEventListener("pointerup", (e) => release(e, true));
     svg3.addEventListener("pointercancel", (e) => release(e, false));
+
+    // Runs of wheel events under 400 ms apart; only a run that starts on the chart may be meant for it.
+    let wheelAt = -Infinity, runOnChart = false;
+    document.addEventListener("wheel", (e) => {
+      if (e.timeStamp - wheelAt > 400) runOnChart = e.target instanceof Node && svg3.contains(e.target) && Math.abs(e.deltaY) > Math.abs(e.deltaX);
+      wheelAt = e.timeStamp;
+    }, { capture: true, passive: true });
+    svg3.addEventListener("wheel", (e) => {
+      const P = panels.cd;
+      if (!P) return;
+      // A plain wheel always scrolls the page; the first few times, say how to zoom.
+      if (!e.ctrlKey && !e.metaKey) {
+        if (runOnChart && !knowsZoom) showHint();
+        return;
+      }
+      if (!e.deltaY) return;
+      // Ctrl or Cmd with the wheel, and trackpad pinches (which arrive that way), zoom toward
+      // the pointer and never zoom the page, even at the limits.
+      e.preventDefault();
+      if (gest || pinch) return;
+      const px = Math.max(-200, Math.min(200, e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? P.H : 1)));
+      const at = clampInto(P.F.R, svgPoint(e));
+      beginZoom();
+      zoomAbout(cam.z * Math.exp(-px * (Math.abs(px) < 40 ? 0.01 : 0.0025)), at);
+      requestCube();
+      clearTimeout(zoomEnd);
+      zoomEnd = setTimeout(() => endZoom(at), 200);
+    }, { passive: false });
+    // Safari's trackpad pinch.
+    svg3.addEventListener("gesturestart", (e) => {
+      e.preventDefault();
+      if (touches.size || pinch || !panels.cd) return;
+      cancelAnim();
+      const F = panels.cd.F, at = clampInto(F.R, svgPoint(e));
+      gest = { z0: cam.z, w: worldAt(F, at), at, depth: project(F.bas, cam.T)[2] };
+      beginZoom();
+    });
+    svg3.addEventListener("gesturechange", (e) => {
+      e.preventDefault();
+      if (!gest || touches.size) return;
+      place(panels.cd.F, clampZ(gest.z0 * e.scale), gest.w, gest.at, gest.depth);
+      requestCube();
+    });
+    svg3.addEventListener("gestureend", (e) => {
+      e.preventDefault();
+      if (!gest) return;
+      const at = gest.at;
+      gest = null;
+      endZoom(at);
+    });
+    for (const type of ["keydown", "keyup"]) {
+      window.addEventListener(type, (e) => {
+        if (e.key === "Shift" && over && !dragging) svg3.style.cursor = type === "keydown" && zoomed() ? "move" : "";
+      });
+    }
+    // A gesture the window lost ends where it is.
+    window.addEventListener("blur", () => {
+      touches.clear();
+      pinchLeft = false;
+      hideHint();
+      if (dragging && grab && grab.pan) {
+        dragging = false;
+        svg3.classList.remove("panning");
+        grab = null;
+        drawCube();
+      }
+      if (pinch || gest || zooming) {
+        pinch = null;
+        gest = null;
+        endZoom(null);
+      }
+    });
+    $("zoom-in-3d").addEventListener("click", () => stepZoom(1, false));
+    $("zoom-out-3d").addEventListener("click", () => stepZoom(-1, false));
+    $("zoom-fit-3d").addEventListener("click", () => fitZoom(false));
 
     for (const [id, prop] of [["turn-3d", "turn"], ["tilt-3d", "tilt"]]) {
       const input = $(id);
@@ -1902,16 +2479,23 @@ function setupBench() {
       input.addEventListener("blur", letGo);
     }
 
+    // Keyboard focus on a point: zoomed in, bring it into view and pivot there.
     const focusOn = (id) => {
       focusId.cd = id;
-      const d = panels.cd.drawn.find((q) => q.p.id === id);
-      if (d) showPoint(d.p, anchorAt(panels.cd, d));
+      let d = panels.cd.drawn.find((q) => q.p.id === id);
+      if (!d) return;
+      if (zoomed()) {
+        if (reveal(d)) { drawCube(); d = panels.cd.drawn.find((q) => q.p.id === id); }
+        else settleDepth(d.depth);
+      }
+      showPoint(d.p, anchorAt(panels.cd, d));
     };
     svg3.addEventListener("focus", () => {
       const P = panels.cd;
       if (!svg3.matches(":focus-visible") || !P || !P.drawn.length) return;
       const keep = P.drawn.find((q) => q.p.id === focusId.cd);
-      const start = keep || P.drawn.find((q) => q.p.id === traced) || P.byRatio.find((q) => q.on) || P.byRatio[0];
+      const start = keep || P.drawn.find((q) => q.p.id === traced && P.shows(q)) || P.byRatio.find((q) => q.on && P.shows(q))
+        || P.byRatio.find((q) => P.shows(q)) || P.drawn.find((q) => q.p.id === traced) || P.byRatio.find((q) => q.on) || P.byRatio[0];
       focusOn(start.p.id);
     });
     svg3.addEventListener("blur", () => { hideTip(); clearRings(); });
@@ -1926,14 +2510,21 @@ function setupBench() {
         cam[prop] = clampAngle(Math.round(cam[prop] + by));
         drawCube();
         say(stepSay());
-        refocus3();
+        refocus3(true);
         return;
       }
       if (/^[1-4]$/.test(e.key)) {
         e.preventDefault();
         const v = VIEWS[+e.key - 1];
-        animateTo(v);
+        animateTo(v, true);
         say(viewSay(v));
+        return;
+      }
+      const zk = { "+": 1, "=": 1, "-": -1, "_": -1, "0": 0 }[e.key];
+      if (zk !== undefined) {
+        e.preventDefault();
+        if (zk) stepZoom(zk, true);
+        else fitZoom(true);
         return;
       }
       if (moveFocus(e, P, focusId.cd, focusOn)) return;
@@ -2056,6 +2647,12 @@ function setupServed(served) {
   const button = $("open-trace"), status = $("serve-status"), reviews = $("reviews");
   const say = (text, error = false) => { status.textContent = text; status.classList.toggle("error", error); };
   $("serve-bar").hidden = false;
+  if (served.id != null) {
+    // The server answers with this page as --html writes it, named for saving.
+    const a = $("page-download");
+    a.href = new URL(`r/${served.id}/download`, root).href;
+    a.hidden = false;
+  }
   let maxUpload = null, maxBenchUpload = null;
 
   // Traces are reviewed one after another; files opened meanwhile wait their turn.

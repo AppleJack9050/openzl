@@ -118,6 +118,12 @@ example with VS Code's Ports view or `ssh -L 8765:127.0.0.1:8765 HOST`.
 - Each review has its own address (`/r/1`, `/r/2`, ...), and `/` opens the
   newest one. **Reviews** lists them all as links; the list refreshes when you
   return to the tab, so traces added from the command line show up.
+- **Download page (HTML)** saves the review you are looking at, with its
+  results, as one HTML file that opens without the server or a network.
+  `sensors.cbor` or `sensors.dot.gz` is saved as `sensors.review.html`, and a
+  page of results alone is named after their input. `--html` writes the same
+  file from the command line, byte for byte:
+  `codec_reviewer.py sensors.cbor --bench-results sensors.bench.json --quiet --html sensors.review.html`.
 - Traces given on the command line are reviewed first, with the other options
   applied (`--show`, `--html`, `--chunk`, ...). If one of them fails, nothing is
   served or added. If a reviewer already serves on the port, the command adds
@@ -242,17 +248,30 @@ decompression speed up, both speeds on log scales.
 - The floor, the back wall and the side wall are shaded with what the
   ratio × compression, ratio × decompression and compression × decompression
   frontiers beat. Stems drop each mark to the floor.
-- Drag to turn it (on a touch screen, swipe sideways), or use **Turn** and
-  **Tilt**. **Ratio × compression** and **Ratio × decompression** look straight
-  down one axis: a 2D chart of ratio against one speed, with that view's
-  frontier as a staircase. They keep the three-way fill, so the note under the
-  box says how many filled marks look beaten there and why: the three-way
-  frontier also takes in points that give up a little of one speed to win on
-  the other (in the test data, `zstd --long=27 -1`). **Compression ×
+- Drag to turn it (on a touch screen, swipe sideways; pinch to zoom), or use
+  **Turn** and **Tilt**. **Ratio × compression** and **Ratio × decompression**
+  look straight down one axis: a 2D chart of ratio against one speed, with
+  that view's frontier as a staircase. They keep the three-way fill, so the
+  note under the box says how many filled marks look beaten there and why: the
+  three-way frontier also takes in points that give up a little of one speed
+  to win on the other (in the test data, `zstd --long=27 -1`). **Compression ×
   decompression** hides the ratio, and **3D** turns back. Keys 1 to 4 pick
   these views.
+- **−** and **+** beside Turn and Tilt zoom in and out, from 100% (the whole
+  box) to 1600%, and **Fit** shows the whole box again. Ctrl+scroll (⌘+scroll
+  on a Mac) or a trackpad pinch zooms toward the pointer; a plain scroll still
+  scrolls the page. On a touch screen, pinch with two fingers and drag them to
+  move. Zoomed in, Shift+drag moves the view, and a plain drag still turns the
+  box about the point in the middle of the view. Views, turning, hiding a
+  series and resizing the page keep the zoom. A zoomed flat view reads like a
+  zoomed 2D chart, with finer ticks where 1, 2 and 5 would leave too few; a
+  turned view labels the box edges that show, and the line under the box gives
+  the ranges in view. An arrow at the edge points to a highlighted point that
+  is out of view.
 - Legend buttons hide a series and show the frontier without it. The arrow keys
   move through the points as drawn, and Shift with an arrow key turns or tilts.
+  + and − zoom toward the focused point and 0 shows the whole box; moving to a
+  point outside the view brings it into view.
 
 **All results** lists every point. Its Frontier column, like the terminal's,
 marks C (on the ratio × compression frontier), D (ratio × decompression) and 3D

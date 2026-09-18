@@ -1,9 +1,10 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 """Serve interactive reviews over HTTP, and review traces opened in the page.
 
-Each review lives at ``/r/<id>`` and ``/`` goes to the newest one. The page
-posts a trace file to ``/api/reviews``; the server analyzes it with the same
-code as the command line and answers with the new review's address.
+Each review lives at ``/r/<id>`` and ``/`` goes to the newest one;
+``/r/<id>/download`` saves a review as the self-contained page ``--html`` writes.
+The page posts a trace file to ``/api/reviews``; the server analyzes it with the
+same code as the command line and answers with the new review's address.
 
 A review can also carry ratio-vs-speed results (``pareto.py``): the command line
 measures them and posts the JSON document to ``/api/reviews/<id>/benchmark``, or
@@ -74,6 +75,32 @@ def trace_name(value: str) -> str:
     return name[:200] or "uploaded trace"
 
 
+def download_name(name: str, trace: bool = True) -> str:
+    """The file name of a review's self-contained page: the trace's name without
+    .gz and then .cbor or .dot (a page of results alone keeps its input's name),
+    plus .review.html."""
+    if trace:
+        name = re.sub(r"\.gz$", "", name, flags=re.IGNORECASE)
+        name = re.sub(r"\.(cbor|dot)$", "", name, flags=re.IGNORECASE)
+    # Control and format characters, lone surrogates, path separators and what
+    # Windows refuses in file names.
+    name = "".join(
+        ch if ch.isprintable() and ch not in '/\\:*?"<>|' else "_" for ch in name
+    )
+    return (name.strip(" .")[:200] or "review") + ".review.html"
+
+
+def attachment(name: str) -> str:
+    """A Content-Disposition that saves the response as ``name``."""
+    # The quoted name is a fallback for clients without filename*: printable
+    # ASCII only, and no % since some of them decode %XX in it.
+    fallback = "".join(
+        ch if " " <= ch <= "~" and ch not in '"\\%' else "_" for ch in name
+    )
+    encoded = urllib.parse.quote(name, safe="", errors="replace")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+
+
 def fit_benchmark(
     doc: Dict[str, object], totals: Optional[Tuple[object, object]]
 ) -> Dict[str, object]:
@@ -122,13 +149,12 @@ class _Review:
     def __init__(
         self,
         entry: Dict[str, object],
-        head: bytes,
-        tail: bytes,
+        parts: Tuple[bytes, ...],
         totals: Optional[Tuple[object, object]],
     ) -> None:
         self.entry = entry
-        self.head = head
-        self.tail = tail
+        self.parts = parts
+        """The page around its results: (head, served entry, rest of head, tail)."""
         self.totals = totals
         self.bench: Optional[Dict[str, object]] = None
         """The results as they were sent; the page shows them fitted to the trace."""
@@ -140,12 +166,18 @@ class _Review:
         self.payload = html_report.bench_payload(shown).encode("utf-8")
         self.entry = dict(self.entry, bench=pareto.summary(doc) if doc else None)
 
+    def page_parts(self, served: bool) -> Tuple[bytes, ...]:
+        """The served page, or without its served entry the page --html writes."""
+        head, entry, rest, tail = self.parts
+        if served:
+            return head, entry, rest, self.payload, tail
+        return head, rest, self.payload, tail
 
-def _render(data: Dict[str, object], review_id: int) -> Tuple[bytes, bytes]:
-    head, tail = html_report.render_parts(
-        dict(data, served={"id": review_id, "root": "../"})
-    )
-    return head.encode("utf-8"), tail.encode("utf-8")
+
+def _render(data: Dict[str, object], review_id: int) -> Tuple[bytes, ...]:
+    # One copy serves both pages: the served entry is a part of its own.
+    parts = html_report.served_parts(data, {"id": review_id, "root": "../"})
+    return tuple(part.encode("utf-8") for part in parts)
 
 
 def _bench_only_entry(review_id: int, doc: Dict[str, object]) -> Dict[str, object]:
@@ -180,7 +212,7 @@ class ReviewStore:
         with self._lock:
             review_id = self._next_id
             self._next_id += 1
-        head, tail = _render(data, review_id)
+        parts = _render(data, review_id)
         if data.get("bench_only"):
             totals = None
             entry = _bench_only_entry(review_id, bench)
@@ -195,7 +227,7 @@ class ReviewStore:
                 "bytes": analysis["bytes"],
                 "failed": analysis["compression_failed"],
             }
-        review = _Review(entry, head, tail, totals)
+        review = _Review(entry, parts, totals)
         review.set_bench(bench)
         with self._lock:
             self._reviews[review_id] = review
@@ -226,7 +258,7 @@ class ReviewStore:
             if review is None:
                 return False
             if bench_only:
-                review.head, review.tail = parts
+                review.parts = parts
                 review.entry = _bench_only_entry(review_id, doc)
             review.set_bench(doc)
             return True
@@ -242,8 +274,19 @@ class ReviewStore:
             review = self._reviews.get(review_id)
             if review is None:
                 return None
-            parts = (review.head, review.payload, review.tail)
+            parts = review.page_parts(served=True)
         return b"".join(parts)
+
+    def download(self, review_id: int) -> Optional[Tuple[str, bytes]]:
+        """A kept review as one self-contained page, the one --html writes for its
+        trace and results: (file name, page), or None."""
+        with self._lock:
+            review = self._reviews.get(review_id)
+            if review is None:
+                return None
+            name = download_name(review.entry["name"], review.totals is not None)
+            parts = review.page_parts(served=False)
+        return name, b"".join(parts)
 
     def issued(self, review_id: int) -> bool:
         """Whether this server ever handed out review_id."""
@@ -422,6 +465,10 @@ def make_server(
                 else:
                     self._send(200, page, "text/html; charset=utf-8")
                 return
+            match = re.fullmatch(r"/r/(\d{1,9})/download", path)
+            if match:
+                self._download(int(match.group(1)))
+                return
             if path == "/api/reviews":
                 self._json(
                     200,
@@ -454,6 +501,26 @@ def make_server(
             self._text(404, "Not found. Reviews are served at /.")
 
         do_HEAD = do_GET
+
+        def _download(self, review_id: int) -> None:
+            found = store.download(review_id)
+            if found is None:
+                if store.issued(review_id):
+                    message = (
+                        f"Review {review_id} is no longer kept; this server keeps "
+                        f"the newest {store.limit} reviews."
+                    )
+                else:
+                    message = f"There is no review {review_id}."
+                self._text(404, message)
+                return
+            name, page = found
+            self._send(
+                200,
+                page,
+                "text/html; charset=utf-8",
+                (("Content-Disposition", attachment(name)),),
+            )
 
         def do_POST(self) -> None:
             if not self._host_allowed():
